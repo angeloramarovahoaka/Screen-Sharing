@@ -5,15 +5,14 @@ import base64
 import time
 import json
 import threading 
+from pynput import keyboard 
+from pynput import mouse # AJOUTÉ
 
 # --- CONFIGURATION RÉSEAU ---
 VIDEO_PORT = 9999
 COMMAND_PORT = 9998
 BUFFER_SIZE = 65536
-
-# >>> ASSUREZ-VOUS QUE C'EST LA BONNE IP DU SERVEUR <<<
 HOST_IP_SERVER = "192.168.11.24" 
-
 ADDR_SERVER_VIDEO = (HOST_IP_SERVER, VIDEO_PORT)
 
 # --- SOCKETS ---
@@ -24,38 +23,79 @@ CLIENT_VIDEO_SOCKET.settimeout(0.01)
 try:
     CLIENT_VIDEO_SOCKET.bind(('0.0.0.0', VIDEO_PORT))
     print(f"✅ Socket vidéo lié à 0.0.0.0:{VIDEO_PORT} pour la réception.")
-except Exception as e:
-    print(f"❌ ERREUR: Impossible de lier le socket vidéo: {e}. Vérifiez si le port est libre.")
+except Exception:
+    pass
 
 CLIENT_COMMAND_SOCKET = None 
 try:
     CLIENT_COMMAND_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     CLIENT_COMMAND_SOCKET.connect((HOST_IP_SERVER, COMMAND_PORT))
     print(f"📡 Connexion TCP établie avec le serveur {HOST_IP_SERVER}:{COMMAND_PORT}.")
-except Exception as e:
-    print(f"❌ ERREUR: Impossible de se connecter au socket de commande TCP: {e}")
+except Exception:
+    pass
 
 # --- CONFIGURATION AFFICHAGE ---
 DEFAULT_WIDTH = 640 
 DEFAULT_HEIGHT = int(DEFAULT_WIDTH * 9 / 16) 
 latest_frame = None
+WINDOW_NAME = f"REMOTE DESKTOP - {HOST_IP_SERVER}"
 
 # --- GESTION DE L'ENVOI DE COMMANDES ---
 
 def send_command(command_dict):
-    """Sérialise le dictionnaire de commande en JSON et l'envoie via TCP."""
     if CLIENT_COMMAND_SOCKET is None:
         return
     try:
-        # Ajout d'un saut de ligne comme délimiteur pour gérer les commandes en rafale
         message = json.dumps(command_dict) + '\n' 
         CLIENT_COMMAND_SOCKET.sendall(message.encode('utf-8'))
     except Exception:
-        # Gérer les déconnexions silencieuses ici
         pass
         
-# Mappage des événements OpenCV vers les actions et boutons pynput
-# Note: pynput gère le mouvement et l'action press/release sur le même point
+# --- GESTION DES COMMANDES CLAVIER (pynput listener) ---
+
+def get_key_name(key):
+    if hasattr(key, 'char') and key.char is not None:
+        return key.char
+    elif isinstance(key, keyboard.Key):
+        return str(key).split('.')[-1]
+    return None
+
+def on_press(key):
+    key_name = get_key_name(key)
+    if key_name:
+        send_command({'type': 'key', 'action': 'press', 'key': key_name})
+
+def on_release(key):
+    key_name = get_key_name(key)
+    if key_name == 'q':
+        return
+    if key_name:
+        send_command({'type': 'key', 'action': 'release', 'key': key_name})
+
+keyboard_listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+keyboard_listener.daemon = True
+keyboard_listener.start()
+
+
+# --- GESTION DU DÉFILEMENT (pynput listener) ---
+
+def on_scroll(x, y, dx, dy):
+    """Envoie la commande de défilement de la molette."""
+    command = {
+        'type': 'mouse',
+        'action': 'scroll',
+        'dx': dx,
+        'dy': dy 
+    }
+    send_command(command)
+    
+mouse_listener = mouse.Listener(on_scroll=on_scroll)
+mouse_listener.daemon = True
+mouse_listener.start()
+
+
+# --- GESTION DES COMMANDES SOURIS (Callback OpenCV) ---
+
 MOUSE_EVENT_MAP = {
     cv2.EVENT_LBUTTONDOWN: ('press', 'left'),
     cv2.EVENT_LBUTTONUP:   ('release', 'left'),
@@ -64,36 +104,28 @@ MOUSE_EVENT_MAP = {
     cv2.EVENT_MBUTTONDOWN: ('press', 'middle'),
     cv2.EVENT_MBUTTONUP:   ('release', 'middle'),
 }
-current_mouse_pos = (0.0, 0.0)
 
 def mouse_callback(event, x, y, flags, param):
-    """Traduit les événements de souris de la fenêtre OpenCV en commandes."""
-    global current_mouse_pos
-    
     if DEFAULT_WIDTH == 0 or DEFAULT_HEIGHT == 0:
         return
         
     normalized_x = x / DEFAULT_WIDTH
     normalized_y = y / DEFAULT_HEIGHT
-    current_mouse_pos = (normalized_x, normalized_y) # Mise à jour de la position pour le mouvement
     
-    # Gestion des clics et relâchements (Press/Release)
+    # 1. Gestion des clics/relâchements
     if event in MOUSE_EVENT_MAP:
         action, button = MOUSE_EVENT_MAP[event]
-        
         command = {
             'type': 'mouse',
-            'action': action, # 'press' ou 'release'
+            'action': action, 
             'button': button,
             'x': normalized_x,
             'y': normalized_y
         }
         send_command(command)
         
-    # Gestion du mouvement (envoi continu si un bouton est maintenu ou s'il y a un grand delta)
+    # 2. Gestion du mouvement
     elif event == cv2.EVENT_MOUSEMOVE:
-        # Envoi d'un événement de "mouvement" pour mettre à jour la position du curseur
-        # sans nécessiter de clic.
         command = {
             'type': 'mouse',
             'action': 'move',
@@ -102,10 +134,20 @@ def mouse_callback(event, x, y, flags, param):
         }
         send_command(command)
         
-# --- BOUCLE PRINCIPALE (Réception Vidéo et Gestion Clavier) ---
+    # 3. L'événement EVENT_MOUSEWHEEL est désormais IGNORÉ ici
+    #    pour éviter le zoom d'OpenCV. Il est géré par pynput.Listener.
 
-WINDOW_NAME = f"REMOTE DESKTOP - {HOST_IP_SERVER}"
-cv2.namedWindow(WINDOW_NAME)
+
+# --- BOUCLE PRINCIPALE (Réception Vidéo et Affichage) ---
+
+# cv2.namedWindow(WINDOW_NAME)
+# cv2.setMouseCallback(WINDOW_NAME, mouse_callback)
+
+cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL) # Utiliser WINDOW_NORMAL
+
+# Redimensionner la fenêtre à la taille désirée immédiatement après la création
+cv2.resizeWindow(WINDOW_NAME, DEFAULT_WIDTH, DEFAULT_HEIGHT)
+
 cv2.setMouseCallback(WINDOW_NAME, mouse_callback)
 
 try:
@@ -117,7 +159,6 @@ print("Démarrage de la boucle de réception vidéo et commandes...")
 while True:
     try:
         packet, addr = CLIENT_VIDEO_SOCKET.recvfrom(BUFFER_SIZE)
-        
         data = base64.b64decode(packet)
         npdata = np.frombuffer(data, dtype=np.uint8)
         frame = cv2.imdecode(npdata, 1)
@@ -134,28 +175,7 @@ while True:
     except Exception:
         time.sleep(0.001)
 
-    # --- GESTION DU CLAVIER (cv2.waitKey) ---
-    key_code = cv2.waitKey(1) & 0xFF
-    
-    if key_code == ord('q'):
-        break # Quitter
-    
-    # Envoyer la frappe clavier au serveur
-    elif key_code != 255 and key_code > 0: # 255 est le code "pas de touche pressée"
-        try:
-            # Convertir le code ASCII en caractère (ex: 97 -> 'a')
-            char = chr(key_code) 
-            
-            # Envoyer la frappe pressée et relâchée immédiatement
-            # Nous envoyons l'action 'press' et 'release' séparément pour plus de fiabilité
-            send_command({'type': 'key', 'action': 'press', 'key': char})
-            send_command({'type': 'key', 'action': 'release', 'key': char})
-            
-        except ValueError:
-             # Gérer les codes non-ASCII ou spéciaux si nécessaire
-             pass 
-
-    # --- AFFICHAGE ---
+    # --- AFFICHAGE ET GESTION QUITTER (Q) ---
     if latest_frame is not None:
         try:
             frame_resized = cv2.resize(latest_frame, (DEFAULT_WIDTH, DEFAULT_HEIGHT))
@@ -167,8 +187,14 @@ while True:
         cv2.putText(black_frame, "ATTENTE DE FLUX VIDEO...", (50, DEFAULT_HEIGHT // 2), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
         cv2.imshow(WINDOW_NAME, black_frame)
+        
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord('q'):
+        break
             
 # --- NETTOYAGE ET FIN ---
+keyboard_listener.stop() 
+mouse_listener.stop() # Arrêter le listener de souris
 print("Fermeture des sockets et nettoyage...")
 CLIENT_VIDEO_SOCKET.close()
 if CLIENT_COMMAND_SOCKET:

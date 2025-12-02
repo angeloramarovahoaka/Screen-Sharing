@@ -8,13 +8,13 @@ import pyscreenshot as ImageGrab
 import threading
 import json
 from pynput.mouse import Controller as MouseController, Button 
-from pynput.keyboard import Controller as KeyboardController, Key # <<< AJOUTER Key
+from pynput.keyboard import Controller as KeyboardController, Key 
 
 # --- CONFIGURATION RÉSEAU ---
+# ... (Configuration réseau inchangée) ...
 VIDEO_PORT = 9999
 COMMAND_PORT = 9998
 BUFFER_SIZE = 65536
-# >>> ASSUREZ-VOUS QUE C'EST L'IP DU CLIENT CENTRAL <<<
 HOST_IP_CLIENT = "IP_CLIENT_CENTRAL" 
 ADDR_CLIENT_VIDEO = (HOST_IP_CLIENT, VIDEO_PORT)
 
@@ -35,10 +35,19 @@ BUTTON_MAP = {
     "middle": Button.middle
 }
 
+# Fonction pour obtenir l'objet touche pynput (caractère ou touche spéciale)
+def get_pynput_key(key_name):
+    """Convertit une chaîne (ex: 'ctrl_l' ou 'a') en objet pynput Key ou caractère."""
+    try:
+        # 1. Essayer de mapper les touches spéciales (Ex: 'enter', 'shift', 'ctrl_l', 'cmd')
+        return getattr(Key, key_name)
+    except AttributeError:
+        # 2. Si ce n'est pas une touche spéciale, la renvoyer comme un caractère simple (Ex: 'a', '1', 'C')
+        return key_name 
+
 # --- THREAD DE RÉCEPTION ET D'EXÉCUTION DES COMMANDES (TCP) ---
 
 def command_listener():
-    """Écoute les commandes du client sur le port TCP 9998."""
     
     COMMAND_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     
@@ -73,42 +82,47 @@ def command_listener():
                         if cmd_type == 'mouse':
                             action = command['action']
                             
-                            # 1. Mise à l'échelle des coordonnées normalisées
-                            x = int(command['x'] * SCREEN_WIDTH)
-                            y = int(command['y'] * SCREEN_HEIGHT)
-                            
-                            # 2. Déplacement et exécution
-                            mouse.position = (x, y) # Déplacement du curseur (pour 'move', 'press', 'release')
+                            # Mise à l'échelle des coordonnées et déplacement du curseur
+                            if action != 'scroll':
+                                x = int(command['x'] * SCREEN_WIDTH)
+                                y = int(command['y'] * SCREEN_HEIGHT)
+                                mouse.position = (x, y) 
 
-                            # Si l'action est 'move', nous avons déjà mis à jour la position
                             if action == 'move':
-                                continue # Pas d'autre action nécessaire
+                                continue 
                                 
-                            button_str = command.get('button')
-                            pynput_button = BUTTON_MAP.get(button_str)
+                            elif action == 'scroll':
+                                # Gestion du défilement
+                                mouse.scroll(command.get('dx', 0), command.get('dy', 0))
+                                
+                            else: # 'press' ou 'release'
+                                button_str = command.get('button')
+                                pynput_button = BUTTON_MAP.get(button_str)
 
-                            if pynput_button:
-                                # Gestion des actions 'press' et 'release'
-                                if action == 'press':
-                                    mouse.press(pynput_button)
-                                elif action == 'release':
-                                    mouse.release(pynput_button)
+                                if pynput_button:
+                                    if action == 'press':
+                                        mouse.press(pynput_button)
+                                    elif action == 'release':
+                                        mouse.release(pynput_button)
                                     
                         elif cmd_type == 'key':
                             action = command['action']
-                            key_char = command['key'] # Caractère reçu (ex: 'a')
+                            key_name = command['key'] # Nom de la touche (ex: 'ctrl_l', 'a')
                             
-                            # pynput gère les caractères directement comme des frappes
-                            if action == 'press':
-                                keyboard.press(key_char)
-                            elif action == 'release':
-                                keyboard.release(key_char)
+                            pynput_key = get_pynput_key(key_name)
+                            
+                            if pynput_key:
+                                if action == 'press':
+                                    keyboard.press(pynput_key)
+                                elif action == 'release':
+                                    keyboard.release(pynput_key)
                                 
                     except json.JSONDecodeError:
-                        print(f"⚠️ Erreur de décodage JSON: {command_json}")
+                        pass
                     except Exception as e:
-                        # Cette erreur peut survenir si une touche spéciale est mal gérée, mais les caractères simples devraient passer.
-                        print(f"⚠️ Erreur lors de l'exécution de la commande: {e}")
+                        # Gérer les touches non reconnues par pynput (peut arriver avec certaines combinaisons OS)
+                        # print(f"⚠️ Erreur lors de l'exécution de la commande: {e}") 
+                        pass
                         
             conn.close()
             print(f"Connexion de commande avec {addr} terminée.")
@@ -117,9 +131,8 @@ def command_listener():
             time.sleep(1)
 
 # --- THREAD PRINCIPAL (STREAMING VIDÉO - UDP) ---
-
+# ... (Fonction video_streamer inchangée) ...
 def video_streamer():
-    """Capture l'écran et envoie la trame au client via UDP."""
     
     VIDEO_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     print("▶️ Le thread de streaming vidéo est actif et commence à envoyer...")
