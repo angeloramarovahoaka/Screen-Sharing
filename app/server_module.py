@@ -191,6 +191,18 @@ class ScreenServer(QObject):
                         
                     try:
                         command = json.loads(command_json)
+                        # Support client registration of its UDP video port
+                        if command.get('type') == 'register':
+                            try:
+                                vp = int(command.get('video_port'))
+                                # Update mapping to (client_ip, client_udp_port)
+                                self.connected_clients[client_id] = (addr[0], vp)
+                                self.client_connected.emit(client_id)
+                                # Optionally log via status_changed signal
+                                self.status_changed.emit(f"Client {client_id} registered for UDP {vp}")
+                            except Exception:
+                                pass
+                            continue
                         self._execute_command(command)
                     except json.JSONDecodeError:
                         pass
