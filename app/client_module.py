@@ -61,10 +61,14 @@ class ScreenClient(QObject):
             self.video_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFFER_SIZE)
             self.video_socket.settimeout(0.1)
             
-            try:
-                self.video_socket.bind(('0.0.0.0', VIDEO_PORT))
-            except:
-                pass
+                try:
+                    # Bind to ephemeral port so multiple clients on same machine don't conflict
+                    self.video_socket.bind(('0.0.0.0', 0))
+                    local_port = self.video_socket.getsockname()[1]
+                    logger.info(f"Bound video socket to 0.0.0.0:{local_port} (ephemeral)")
+                except Exception as e:
+                    logger.exception(f"Could not bind video socket: {e}")
+                    # continue; socket may still work for sends
                 
             # Socket commandes TCP
             self.command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -78,8 +82,19 @@ class ScreenClient(QObject):
             self.receive_thread = threading.Thread(target=self._receive_video, daemon=True)
             self.receive_thread.start()
             
-            # Envoyer le message de démarrage
-            self.video_socket.sendto(b'START', (server_ip, VIDEO_PORT))
+                # Inform the server which UDP port we listen on for video
+                try:
+                    reg = {'type': 'register', 'video_port': self.video_socket.getsockname()[1]}
+                    self.command_socket.sendall((json.dumps(reg) + '\n').encode('utf-8'))
+                    logger.info(f"Sent register to server: {reg}")
+                except Exception as e:
+                    logger.exception(f"Failed to send register to server: {e}")
+                # Also send START to signal readiness (server may ignore if using register)
+                try:
+                    self.video_socket.sendto(b'START', (server_ip, VIDEO_PORT))
+                    logger.debug(f"Sent START to {(server_ip, VIDEO_PORT)}")
+                except Exception:
+                    logger.debug("Failed to send START (non-fatal)")
             
             self.status_changed.emit(f"Connecté à {server_ip}")
             self.connected.emit()
