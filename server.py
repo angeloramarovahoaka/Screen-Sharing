@@ -11,11 +11,10 @@ from pynput.mouse import Controller as MouseController, Button
 from pynput.keyboard import Controller as KeyboardController, Key 
 
 # --- CONFIGURATION RÉSEAU ---
-# ... (Configuration réseau inchangée) ...
 VIDEO_PORT = 9999
 COMMAND_PORT = 9998
 BUFFER_SIZE = 65536
-HOST_IP_CLIENT = "IP_CLIENT_CENTRAL" 
+HOST_IP_CLIENT = "192.168.11.42" 
 ADDR_CLIENT_VIDEO = (HOST_IP_CLIENT, VIDEO_PORT)
 
 # --- CONFIGURATION OPTIMISATION ET TRAME ---

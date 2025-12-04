@@ -13,6 +13,8 @@ import json
 from PySide6.QtCore import QObject, Signal, QThread
 from pynput.mouse import Controller as MouseController, Button
 from pynput.keyboard import Controller as KeyboardController, Key
+import logging
+import os
 
 try:
     import pyscreenshot as ImageGrab
@@ -21,6 +23,15 @@ except ImportError:
 
 from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, JPEG_QUALITY, DEFAULT_WIDTH
 
+# Logger
+LOG_LEVEL = os.getenv("SS_LOG_LEVEL", "INFO").upper()
+logger = logging.getLogger("screenshare.server")
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
 class ScreenServer(QObject):
     """
@@ -73,6 +84,7 @@ class ScreenServer(QObject):
         """Démarre le serveur de partage d'écran"""
         self.client_ip = client_ip
         self.is_running = True
+        logger.info(f"Starting ScreenServer for client {client_ip}")
         
         # Démarrer le thread des commandes
         self.command_thread = threading.Thread(target=self._command_listener, daemon=True)
@@ -83,10 +95,12 @@ class ScreenServer(QObject):
         self.video_thread.start()
         
         self.status_changed.emit("Serveur démarré")
+        logger.info("Serveur démarré (signals emitted)")
         
     def stop(self):
         """Arrête le serveur"""
         self.is_running = False
+        logger.info("Stopping ScreenServer")
         
         if self.video_socket:
             try:
@@ -101,12 +115,14 @@ class ScreenServer(QObject):
                 pass
                 
         self.status_changed.emit("Serveur arrêté")
+        logger.info("Serveur arrêté (signals emitted)")
         
     def _video_streamer(self):
         """Thread de streaming vidéo"""
         try:
             self.video_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.status_changed.emit("Streaming vidéo démarré")
+            logger.info("Video streamer thread started")
             
             while self.is_running:
                 try:
@@ -123,17 +139,21 @@ class ScreenServer(QObject):
                     b64encoded = base64.b64encode(buffer)
                     
                     # Envoi à tous les clients connectés
-                    for client_id, client_addr in self.connected_clients.items():
+                    for client_id, client_addr in list(self.connected_clients.items()):
                         try:
-                            self.video_socket.sendto(b64encoded, client_addr)
-                        except:
-                            pass
+                            sent = self.video_socket.sendto(b64encoded, client_addr)
+                            logger.debug(f"Sent video packet to {client_addr} ({len(b64encoded)} bytes) -> sendto returned {sent}")
+                        except Exception as e:
+                            logger.exception(f"Erreur en envoyant vers {client_addr}: {e}")
+                            # Ne pas supprimer le client automatiquement; laisser la logique de socket gérer
                             
                 except Exception as e:
+                    logger.debug(f"Erreur dans video_streamer loop: {e}")
                     time.sleep(0.01)
                     
         except Exception as e:
             self.error_occurred.emit(f"Erreur vidéo: {e}")
+            logger.exception(f"Video streamer fatal error: {e}")
         finally:
             if self.video_socket:
                 self.video_socket.close()
@@ -146,6 +166,7 @@ class ScreenServer(QObject):
             self.command_socket.bind(('0.0.0.0', COMMAND_PORT))
             self.command_socket.listen(5)
             self.status_changed.emit(f"Écoute commandes sur port {COMMAND_PORT}")
+            logger.info(f"Listening for command connections on 0.0.0.0:{COMMAND_PORT}")
             
             while self.is_running:
                 try:
@@ -154,6 +175,7 @@ class ScreenServer(QObject):
                     client_id = f"{addr[0]}:{addr[1]}"
                     self.connected_clients[client_id] = (addr[0], VIDEO_PORT)
                     self.client_connected.emit(client_id)
+                    logger.info(f"Accepted command connection from {addr}; registered client_id={client_id}")
                     
                     # Traiter les commandes de ce client
                     client_thread = threading.Thread(
@@ -167,10 +189,12 @@ class ScreenServer(QObject):
                     continue
                 except Exception as e:
                     if self.is_running:
+                        logger.debug(f"Error in command_listener accept loop: {e}")
                         time.sleep(0.1)
                         
         except Exception as e:
             self.error_occurred.emit(f"Erreur commandes: {e}")
+            logger.exception(f"Command listener fatal error: {e}")
         finally:
             if self.command_socket:
                 self.command_socket.close()
@@ -178,32 +202,42 @@ class ScreenServer(QObject):
     def _handle_client_commands(self, conn, addr, client_id):
         """Gère les commandes d'un client spécifique"""
         try:
+            logger.debug(f"Start handling commands for {client_id}")
             while self.is_running:
                 data = conn.recv(1024)
                 if not data:
                     break
                     
-                command_str = data.decode('utf-8')
+                logger.debug(f"Received {len(data)} bytes from {addr}")
+                try:
+                    command_str = data.decode('utf-8')
+                except Exception:
+                    logger.exception("Failed to decode command bytes as utf-8")
+                    continue
                 
                 for command_json in command_str.split('\n'):
                     if not command_json:
                         continue
                         
                     try:
+                        logger.debug(f"Command JSON raw: {command_json}")
                         command = json.loads(command_json)
                         self._execute_command(command)
                     except json.JSONDecodeError:
+                        logger.warning(f"JSON decode error for: {command_json}")
                         pass
                     except Exception as e:
+                        logger.exception(f"Error executing command: {e}")
                         pass
                         
         except Exception as e:
-            pass
+            logger.exception(f"Exception in client command handler for {client_id}: {e}")
         finally:
             conn.close()
             if client_id in self.connected_clients:
                 del self.connected_clients[client_id]
             self.client_disconnected.emit(client_id)
+            logger.info(f"Closed command connection for {client_id}")
             
     def _execute_command(self, command):
         """Exécute une commande reçue"""

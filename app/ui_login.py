@@ -115,6 +115,7 @@ class LoginWindow(QWidget):
                 padding: 8px 12px;
                 font-size: 14px;
                 background-color: white;
+                color: #333;
             }
             QLineEdit:focus {
                 border-color: #2196F3;
