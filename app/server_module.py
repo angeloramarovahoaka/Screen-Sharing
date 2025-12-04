@@ -261,7 +261,17 @@ class ScreenServer(QObject):
                     try:
                         logger.debug(f"Command JSON raw: {command_json}")
                         command = json.loads(command_json)
-                        self._execute_command(command)
+                        # Special handling for 'register' so client can tell us its UDP port
+                        if isinstance(command, dict) and command.get('type') == 'register':
+                            try:
+                                video_port = int(command.get('video_port', VIDEO_PORT))
+                                # Update mapping so we send video UDP to the provided port
+                                self.connected_clients[client_id] = (addr[0], video_port)
+                                logger.info(f"Registered client {client_id} -> {(addr[0], video_port)}")
+                            except Exception as e:
+                                logger.exception(f"Failed to process register from {client_id}: {e}")
+                        else:
+                            self._execute_command(command)
                     except json.JSONDecodeError:
                         logger.warning(f"JSON decode error for: {command_json}")
                         pass

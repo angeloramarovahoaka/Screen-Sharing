@@ -96,20 +96,12 @@ class ScreenClient(QObject):
             self.video_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFFER_SIZE)
             self.video_socket.settimeout(0.1)
             
+            # Bind explicitly to an ephemeral UDP port (0) so multiple viewers don't conflict.
             try:
-<<<<<<< Updated upstream
-                self.video_socket.bind(('0.0.0.0', VIDEO_PORT))
-            except:
-                pass
-=======
-                # Bind to ephemeral port so multiple clients on same machine don't conflict
                 self.video_socket.bind(('0.0.0.0', 0))
-                local_port = self.video_socket.getsockname()[1]
-                logger.info(f"Bound video socket to 0.0.0.0:{local_port} (ephemeral)")
-            except Exception as e:
-                logger.exception(f"Could not bind video socket: {e}")
-                # continue; socket may still work for sends
->>>>>>> Stashed changes
+            except Exception:
+                # If bind fails, continue; we'll still attempt to use the socket.
+                logger.exception("Failed to bind video socket to ephemeral port")
                 
             # Socket commandes TCP
             self.command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -119,18 +111,23 @@ class ScreenClient(QObject):
             self.is_connected = True
             self.is_running = True
             
-            # Démarrer le thread de réception
+            # Démarrer le thread de réception (doit être lancé avant d'attendre des paquets)
             self.receive_thread = threading.Thread(target=self._receive_video, daemon=True)
             self.receive_thread.start()
-            
-<<<<<<< Updated upstream
-            # Envoyer le message de démarrage
-            self.video_socket.sendto(b'START', (server_ip, VIDEO_PORT))
-            
-=======
-                # Inform the server which UDP port we listen on for video
+
+            # Inform the server which UDP port we listen on for video (register)
             try:
-                reg = {'type': 'register', 'video_port': self.video_socket.getsockname()[1]}
+                bound_port = self.video_socket.getsockname()[1]
+                # If socket was not bound, getsockname may return 0; guard against that.
+                if not bound_port:
+                    # Try to bind explicitly to ephemeral port
+                    try:
+                        self.video_socket.bind(('0.0.0.0', 0))
+                        bound_port = self.video_socket.getsockname()[1]
+                    except Exception:
+                        bound_port = 0
+
+                reg = {'type': 'register', 'video_port': int(bound_port)}
                 self.command_socket.sendall((json.dumps(reg) + '\n').encode('utf-8'))
                 logger.info(f"Sent register to server: {reg}")
             except Exception as e:
@@ -142,7 +139,6 @@ class ScreenClient(QObject):
             except Exception:
                 logger.debug("Failed to send START (non-fatal)")
         
->>>>>>> Stashed changes
             self.status_changed.emit(f"Connecté à {server_ip}")
             self.connected.emit()
             
