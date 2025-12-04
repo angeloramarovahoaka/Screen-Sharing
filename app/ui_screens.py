@@ -1,0 +1,595 @@
+"""
+Widgets pour l'affichage et la manipulation des écrans partagés
+"""
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
+    QFrame, QSizePolicy, QMenu, QToolButton, QSlider, QGridLayout
+)
+from PySide6.QtCore import Signal, Qt, QSize, QPoint, QTimer
+from PySide6.QtGui import (
+    QImage, QPixmap, QPainter, QFont, QMouseEvent, 
+    QKeyEvent, QWheelEvent, QCursor
+)
+
+from .client_module import ScreenClient
+
+
+class ScreenThumbnail(QFrame):
+    """
+    Widget miniature pour afficher un écran dans la liste
+    """
+    clicked = Signal(str)  # screen_id
+    double_clicked = Signal(str)  # screen_id pour zoom
+    remove_requested = Signal(str)  # screen_id
+    
+    def __init__(self, screen_id, screen_name, parent=None):
+        super().__init__(parent)
+        self.screen_id = screen_id
+        self.screen_name = screen_name
+        self.is_selected = False
+        self.current_image = None
+        
+        self.setFixedSize(200, 140)
+        self.setFrameShape(QFrame.StyledPanel)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setup_ui()
+        self.update_style()
+        
+    def setup_ui(self):
+        """Configure l'interface"""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(5)
+        
+        # Zone d'affichage de l'écran
+        self.screen_label = QLabel()
+        self.screen_label.setAlignment(Qt.AlignCenter)
+        self.screen_label.setMinimumSize(190, 100)
+        self.screen_label.setStyleSheet("background-color: #1a1a1a; border-radius: 3px;")
+        self.screen_label.setText("📺 En attente...")
+        self.screen_label.setStyleSheet("""
+            QLabel {
+                background-color: #1a1a1a;
+                color: #666;
+                border-radius: 3px;
+            }
+        """)
+        layout.addWidget(self.screen_label)
+        
+        # Barre d'info
+        info_layout = QHBoxLayout()
+        
+        # Indicateur de statut
+        self.status_indicator = QLabel("🟢")
+        self.status_indicator.setFixedSize(20, 20)
+        info_layout.addWidget(self.status_indicator)
+        
+        # Nom de l'écran
+        self.name_label = QLabel(self.screen_name)
+        self.name_label.setFont(QFont("Segoe UI", 9))
+        info_layout.addWidget(self.name_label)
+        
+        info_layout.addStretch()
+        
+        # Bouton menu
+        self.menu_button = QToolButton()
+        self.menu_button.setText("⋮")
+        self.menu_button.setPopupMode(QToolButton.InstantPopup)
+        self.menu_button.setStyleSheet("""
+            QToolButton {
+                border: none;
+                padding: 2px 5px;
+            }
+            QToolButton:hover {
+                background-color: rgba(0,0,0,0.1);
+                border-radius: 3px;
+            }
+        """)
+        
+        menu = QMenu(self.menu_button)
+        menu.addAction("🔍 Zoom", lambda: self.double_clicked.emit(self.screen_id))
+        menu.addAction("❌ Déconnecter", lambda: self.remove_requested.emit(self.screen_id))
+        self.menu_button.setMenu(menu)
+        info_layout.addWidget(self.menu_button)
+        
+        layout.addLayout(info_layout)
+        
+    def update_style(self):
+        """Met à jour le style selon l'état de sélection"""
+        if self.is_selected:
+            self.setStyleSheet("""
+                QFrame {
+                    background-color: #e3f2fd;
+                    border: 2px solid #2196F3;
+                    border-radius: 8px;
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QFrame {
+                    background-color: white;
+                    border: 1px solid #ddd;
+                    border-radius: 8px;
+                }
+                QFrame:hover {
+                    border-color: #2196F3;
+                }
+            """)
+            
+    def update_frame(self, image: QImage):
+        """Met à jour l'image affichée"""
+        self.current_image = image
+        if image and not image.isNull():
+            pixmap = QPixmap.fromImage(image)
+            scaled = pixmap.scaled(
+                self.screen_label.size(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+            self.screen_label.setPixmap(scaled)
+            
+    def set_selected(self, selected):
+        """Définit l'état de sélection"""
+        self.is_selected = selected
+        self.update_style()
+        
+    def set_status(self, connected):
+        """Met à jour l'indicateur de statut"""
+        self.status_indicator.setText("🟢" if connected else "🔴")
+        
+    def mousePressEvent(self, event):
+        """Gère le clic"""
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit(self.screen_id)
+        super().mousePressEvent(event)
+        
+    def mouseDoubleClickEvent(self, event):
+        """Gère le double-clic"""
+        if event.button() == Qt.LeftButton:
+            self.double_clicked.emit(self.screen_id)
+        super().mouseDoubleClickEvent(event)
+
+
+class ScreenViewer(QWidget):
+    """
+    Widget principal pour afficher et manipuler un écran en mode zoom
+    """
+    close_requested = Signal()
+    
+    def __init__(self, screen_id, client: ScreenClient, parent=None):
+        super().__init__(parent)
+        self.screen_id = screen_id
+        self.client = client
+        self.current_image = None
+        self.zoom_level = 1.0
+        self.is_controlling = True
+        
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setMouseTracking(True)
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Configure l'interface"""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Barre d'outils
+        toolbar = QFrame()
+        toolbar.setFixedHeight(40)
+        toolbar.setStyleSheet("""
+            QFrame {
+                background-color: #333;
+                border-bottom: 1px solid #444;
+            }
+        """)
+        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(10, 5, 10, 5)
+        
+        # Titre
+        title = QLabel(f"🖥️ {self.screen_id}")
+        title.setStyleSheet("color: white; font-weight: bold;")
+        toolbar_layout.addWidget(title)
+        
+        toolbar_layout.addStretch()
+        
+        # Contrôles de zoom
+        zoom_out_btn = QToolButton()
+        zoom_out_btn.setText("➖")
+        zoom_out_btn.setStyleSheet("color: white; border: none; padding: 5px;")
+        zoom_out_btn.clicked.connect(self.zoom_out)
+        toolbar_layout.addWidget(zoom_out_btn)
+        
+        self.zoom_label = QLabel("100%")
+        self.zoom_label.setStyleSheet("color: white; min-width: 50px;")
+        self.zoom_label.setAlignment(Qt.AlignCenter)
+        toolbar_layout.addWidget(self.zoom_label)
+        
+        zoom_in_btn = QToolButton()
+        zoom_in_btn.setText("➕")
+        zoom_in_btn.setStyleSheet("color: white; border: none; padding: 5px;")
+        zoom_in_btn.clicked.connect(self.zoom_in)
+        toolbar_layout.addWidget(zoom_in_btn)
+        
+        # Bouton plein écran
+        fullscreen_btn = QToolButton()
+        fullscreen_btn.setText("⛶")
+        fullscreen_btn.setStyleSheet("color: white; border: none; padding: 5px;")
+        fullscreen_btn.clicked.connect(self.toggle_fullscreen)
+        toolbar_layout.addWidget(fullscreen_btn)
+        
+        # Toggle contrôle
+        self.control_btn = QToolButton()
+        self.control_btn.setText("🖱️ Contrôle: ON")
+        self.control_btn.setStyleSheet("""
+            QToolButton {
+                color: #4CAF50;
+                border: 1px solid #4CAF50;
+                border-radius: 3px;
+                padding: 5px 10px;
+            }
+        """)
+        self.control_btn.clicked.connect(self.toggle_control)
+        toolbar_layout.addWidget(self.control_btn)
+        
+        # Bouton fermer
+        close_btn = QToolButton()
+        close_btn.setText("✕")
+        close_btn.setStyleSheet("""
+            QToolButton {
+                color: white;
+                border: none;
+                padding: 5px;
+            }
+            QToolButton:hover {
+                background-color: #f44336;
+                border-radius: 3px;
+            }
+        """)
+        close_btn.clicked.connect(self.close_requested.emit)
+        toolbar_layout.addWidget(close_btn)
+        
+        layout.addWidget(toolbar)
+        
+        # Zone d'affichage de l'écran
+        self.screen_area = QScrollArea()
+        self.screen_area.setWidgetResizable(True)
+        self.screen_area.setStyleSheet("""
+            QScrollArea {
+                background-color: #1a1a1a;
+                border: none;
+            }
+        """)
+        
+        self.screen_label = QLabel()
+        self.screen_label.setAlignment(Qt.AlignCenter)
+        self.screen_label.setMouseTracking(True)
+        self.screen_label.setStyleSheet("background-color: #1a1a1a;")
+        self.screen_area.setWidget(self.screen_label)
+        
+        layout.addWidget(self.screen_area)
+        
+    def update_frame(self, image: QImage):
+        """Met à jour l'image affichée"""
+        self.current_image = image
+        if image and not image.isNull():
+            # Appliquer le zoom
+            new_size = image.size() * self.zoom_level
+            scaled_image = image.scaled(
+                new_size,
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+            self.screen_label.setPixmap(QPixmap.fromImage(scaled_image))
+            self.screen_label.setFixedSize(scaled_image.size())
+            
+    def zoom_in(self):
+        """Augmente le zoom"""
+        self.zoom_level = min(3.0, self.zoom_level + 0.25)
+        self.zoom_label.setText(f"{int(self.zoom_level * 100)}%")
+        if self.current_image:
+            self.update_frame(self.current_image)
+            
+    def zoom_out(self):
+        """Diminue le zoom"""
+        self.zoom_level = max(0.25, self.zoom_level - 0.25)
+        self.zoom_label.setText(f"{int(self.zoom_level * 100)}%")
+        if self.current_image:
+            self.update_frame(self.current_image)
+            
+    def toggle_fullscreen(self):
+        """Bascule le mode plein écran"""
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
+            
+    def toggle_control(self):
+        """Active/désactive le contrôle distant"""
+        self.is_controlling = not self.is_controlling
+        if self.is_controlling:
+            self.control_btn.setText("🖱️ Contrôle: ON")
+            self.control_btn.setStyleSheet("""
+                QToolButton {
+                    color: #4CAF50;
+                    border: 1px solid #4CAF50;
+                    border-radius: 3px;
+                    padding: 5px 10px;
+                }
+            """)
+        else:
+            self.control_btn.setText("🖱️ Contrôle: OFF")
+            self.control_btn.setStyleSheet("""
+                QToolButton {
+                    color: #f44336;
+                    border: 1px solid #f44336;
+                    border-radius: 3px;
+                    padding: 5px 10px;
+                }
+            """)
+            
+    def _get_normalized_position(self, pos):
+        """Convertit la position en coordonnées normalisées"""
+        label_pos = self.screen_label.mapFrom(self, pos)
+        pixmap = self.screen_label.pixmap()
+        if not pixmap:
+            return None, None
+            
+        # Calculer l'offset si l'image est centrée
+        offset_x = (self.screen_label.width() - pixmap.width()) // 2
+        offset_y = (self.screen_label.height() - pixmap.height()) // 2
+        
+        x = label_pos.x() - offset_x
+        y = label_pos.y() - offset_y
+        
+        if 0 <= x <= pixmap.width() and 0 <= y <= pixmap.height():
+            return x / pixmap.width(), y / pixmap.height()
+        return None, None
+        
+    def mouseMoveEvent(self, event: QMouseEvent):
+        """Gère le mouvement de la souris"""
+        if self.is_controlling and self.client:
+            norm_x, norm_y = self._get_normalized_position(event.pos())
+            if norm_x is not None:
+                self.client.send_command({
+                    'type': 'mouse',
+                    'action': 'move',
+                    'x': norm_x,
+                    'y': norm_y
+                })
+        super().mouseMoveEvent(event)
+        
+    def mousePressEvent(self, event: QMouseEvent):
+        """Gère le clic souris"""
+        if self.is_controlling and self.client:
+            norm_x, norm_y = self._get_normalized_position(event.pos())
+            if norm_x is not None:
+                button_map = {
+                    Qt.LeftButton: 'left',
+                    Qt.RightButton: 'right',
+                    Qt.MiddleButton: 'middle'
+                }
+                button = button_map.get(event.button())
+                if button:
+                    self.client.send_command({
+                        'type': 'mouse',
+                        'action': 'press',
+                        'button': button,
+                        'x': norm_x,
+                        'y': norm_y
+                    })
+        super().mousePressEvent(event)
+        
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        """Gère le relâchement du clic"""
+        if self.is_controlling and self.client:
+            norm_x, norm_y = self._get_normalized_position(event.pos())
+            if norm_x is not None:
+                button_map = {
+                    Qt.LeftButton: 'left',
+                    Qt.RightButton: 'right',
+                    Qt.MiddleButton: 'middle'
+                }
+                button = button_map.get(event.button())
+                if button:
+                    self.client.send_command({
+                        'type': 'mouse',
+                        'action': 'release',
+                        'button': button,
+                        'x': norm_x,
+                        'y': norm_y
+                    })
+        super().mouseReleaseEvent(event)
+        
+    def wheelEvent(self, event: QWheelEvent):
+        """Gère la molette de la souris"""
+        if self.is_controlling and self.client:
+            delta = event.angleDelta()
+            dx = delta.x() // 120
+            dy = delta.y() // 120
+            self.client.send_command({
+                'type': 'mouse',
+                'action': 'scroll',
+                'dx': dx,
+                'dy': dy
+            })
+        super().wheelEvent(event)
+        
+    def keyPressEvent(self, event: QKeyEvent):
+        """Gère les appuis de touches"""
+        if self.is_controlling and self.client:
+            key_name = self._get_key_name(event)
+            if key_name:
+                self.client.send_command({
+                    'type': 'key',
+                    'action': 'press',
+                    'key': key_name
+                })
+        super().keyPressEvent(event)
+        
+    def keyReleaseEvent(self, event: QKeyEvent):
+        """Gère les relâchements de touches"""
+        if self.is_controlling and self.client:
+            key_name = self._get_key_name(event)
+            if key_name:
+                self.client.send_command({
+                    'type': 'key',
+                    'action': 'release',
+                    'key': key_name
+                })
+        super().keyReleaseEvent(event)
+        
+    def _get_key_name(self, event: QKeyEvent):
+        """Convertit un événement clavier en nom de touche"""
+        key = event.key()
+        text = event.text()
+        
+        # Mapping des touches spéciales
+        special_keys = {
+            Qt.Key_Return: 'enter',
+            Qt.Key_Enter: 'enter',
+            Qt.Key_Backspace: 'backspace',
+            Qt.Key_Tab: 'tab',
+            Qt.Key_Escape: 'esc',
+            Qt.Key_Space: 'space',
+            Qt.Key_Delete: 'delete',
+            Qt.Key_Home: 'home',
+            Qt.Key_End: 'end',
+            Qt.Key_Left: 'left',
+            Qt.Key_Right: 'right',
+            Qt.Key_Up: 'up',
+            Qt.Key_Down: 'down',
+            Qt.Key_PageUp: 'page_up',
+            Qt.Key_PageDown: 'page_down',
+            Qt.Key_Shift: 'shift',
+            Qt.Key_Control: 'ctrl',
+            Qt.Key_Alt: 'alt',
+            Qt.Key_CapsLock: 'caps_lock',
+            Qt.Key_F1: 'f1',
+            Qt.Key_F2: 'f2',
+            Qt.Key_F3: 'f3',
+            Qt.Key_F4: 'f4',
+            Qt.Key_F5: 'f5',
+            Qt.Key_F6: 'f6',
+            Qt.Key_F7: 'f7',
+            Qt.Key_F8: 'f8',
+            Qt.Key_F9: 'f9',
+            Qt.Key_F10: 'f10',
+            Qt.Key_F11: 'f11',
+            Qt.Key_F12: 'f12',
+        }
+        
+        if key in special_keys:
+            return special_keys[key]
+        elif text and text.isprintable():
+            return text
+        return None
+
+
+class ScreenListWidget(QWidget):
+    """
+    Widget pour afficher la liste des écrans connectés
+    """
+    screen_selected = Signal(str)
+    screen_zoom_requested = Signal(str)
+    screen_remove_requested = Signal(str)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.thumbnails = {}
+        self.selected_screen = None
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Configure l'interface"""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Titre
+        title = QLabel("📺 Écrans connectés")
+        title.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        layout.addWidget(title)
+        
+        # Zone de scroll pour les miniatures
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background-color: transparent;
+            }
+        """)
+        
+        self.grid_widget = QWidget()
+        self.grid_layout = QGridLayout(self.grid_widget)
+        self.grid_layout.setSpacing(10)
+        self.grid_layout.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        
+        scroll.setWidget(self.grid_widget)
+        layout.addWidget(scroll)
+        
+        # Message si aucun écran
+        self.empty_label = QLabel("Aucun écran connecté.\nCliquez sur 'Ajouter' pour vous connecter à un serveur.")
+        self.empty_label.setAlignment(Qt.AlignCenter)
+        self.empty_label.setStyleSheet("color: #999; padding: 50px;")
+        layout.addWidget(self.empty_label)
+        
+    def add_screen(self, screen_id, screen_name):
+        """Ajoute un écran à la liste"""
+        if screen_id in self.thumbnails:
+            return
+            
+        thumbnail = ScreenThumbnail(screen_id, screen_name)
+        thumbnail.clicked.connect(self._on_thumbnail_clicked)
+        thumbnail.double_clicked.connect(self.screen_zoom_requested.emit)
+        thumbnail.remove_requested.connect(self.screen_remove_requested.emit)
+        
+        self.thumbnails[screen_id] = thumbnail
+        self._update_grid()
+        self.empty_label.hide()
+        
+    def remove_screen(self, screen_id):
+        """Retire un écran de la liste"""
+        if screen_id in self.thumbnails:
+            thumbnail = self.thumbnails[screen_id]
+            self.grid_layout.removeWidget(thumbnail)
+            thumbnail.deleteLater()
+            del self.thumbnails[screen_id]
+            
+            if self.selected_screen == screen_id:
+                self.selected_screen = None
+                
+            self._update_grid()
+            
+            if not self.thumbnails:
+                self.empty_label.show()
+                
+    def update_screen_frame(self, screen_id, image: QImage):
+        """Met à jour la frame d'un écran"""
+        if screen_id in self.thumbnails:
+            self.thumbnails[screen_id].update_frame(image)
+            
+    def _update_grid(self):
+        """Réorganise la grille des miniatures"""
+        # Retirer tous les widgets
+        for i in reversed(range(self.grid_layout.count())):
+            self.grid_layout.itemAt(i).widget().setParent(None)
+            
+        # Réajouter dans la grille
+        cols = 3
+        for i, thumbnail in enumerate(self.thumbnails.values()):
+            row = i // cols
+            col = i % cols
+            self.grid_layout.addWidget(thumbnail, row, col)
+            
+    def _on_thumbnail_clicked(self, screen_id):
+        """Gère le clic sur une miniature"""
+        # Désélectionner l'ancien
+        if self.selected_screen and self.selected_screen in self.thumbnails:
+            self.thumbnails[self.selected_screen].set_selected(False)
+            
+        # Sélectionner le nouveau
+        self.selected_screen = screen_id
+        self.thumbnails[screen_id].set_selected(True)
+        self.screen_selected.emit(screen_id)

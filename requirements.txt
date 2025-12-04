@@ -1,0 +1,19 @@
+# Screen Sharing Remote Desktop - Dépendances
+
+# Interface graphique
+PySide6>=6.5.0
+
+# Traitement vidéo
+opencv-python>=4.8.0
+numpy>=1.24.0
+imutils>=0.5.4
+
+# Capture d'écran
+pyscreenshot>=3.1
+Pillow>=10.0.0
+
+# Contrôle clavier/souris
+pynput>=1.7.6
+
+# Audio (optionnel - pour la fonctionnalité d'appel)
+PyAudio>=0.2.13
