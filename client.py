@@ -4,7 +4,6 @@ import numpy as np
 import base64
 import time
 import json
-import threading 
 from pynput import keyboard 
 from pynput import mouse # AJOUTÉ
 
@@ -12,7 +11,7 @@ from pynput import mouse # AJOUTÉ
 VIDEO_PORT = 9999
 COMMAND_PORT = 9998
 BUFFER_SIZE = 65536
-HOST_IP_SERVER = "192.168.11.24" 
+HOST_IP_SERVER = "192.168.11.19" 
 ADDR_SERVER_VIDEO = (HOST_IP_SERVER, VIDEO_PORT)
 
 # --- SOCKETS ---
