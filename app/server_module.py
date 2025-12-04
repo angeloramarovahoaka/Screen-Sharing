@@ -15,10 +15,7 @@ from pynput.mouse import Controller as MouseController, Button
 from pynput.keyboard import Controller as KeyboardController, Key
 import logging
 import os
-<<<<<<< Updated upstream
-=======
 from logging.handlers import RotatingFileHandler, DatagramHandler
->>>>>>> Stashed changes
 
 try:
     import pyscreenshot as ImageGrab
@@ -27,25 +24,20 @@ except ImportError:
 
 from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, JPEG_QUALITY, DEFAULT_WIDTH
 
-<<<<<<< Updated upstream
 # Logger
 LOG_LEVEL = os.getenv("SS_LOG_LEVEL", "INFO").upper()
 logger = logging.getLogger("screenshare.server")
 if not logger.handlers:
-=======
-# --- Logging configuration ---
-LOG_LEVEL = os.getenv("SS_LOG_LEVEL", "INFO").upper()
-logger = logging.getLogger("screenshare.server")
+    # --- Logging configuration ---
+    LOG_LEVEL = os.getenv("SS_LOG_LEVEL", "INFO").upper()
+    logger = logging.getLogger("screenshare.server")
 if not logger.handlers:
     # Console handler
->>>>>>> Stashed changes
     ch = logging.StreamHandler()
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
     ch.setFormatter(formatter)
     logger.addHandler(ch)
-<<<<<<< Updated upstream
-logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
-=======
+    logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
     # File Rotating handler (logs/server.log)
     try:
@@ -70,7 +62,6 @@ logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
 logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
->>>>>>> Stashed changes
 
 class ScreenServer(QObject):
     """
