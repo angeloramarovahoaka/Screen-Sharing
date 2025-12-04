@@ -14,6 +14,41 @@ from PySide6.QtGui import QImage, QPixmap
 from pynput import keyboard, mouse
 
 from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, DEFAULT_WIDTH, DEFAULT_HEIGHT
+import logging
+import os
+from logging.handlers import RotatingFileHandler, DatagramHandler
+
+# --- Logging configuration ---
+LOG_LEVEL = os.getenv("SS_LOG_LEVEL", "INFO").upper()
+logger = logging.getLogger("screenshare.client")
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    # File Rotating handler
+    try:
+        logs_dir = os.path.join(os.getcwd(), "logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        file_path = os.path.join(logs_dir, "client.log")
+        fh = RotatingFileHandler(file_path, maxBytes=5 * 1024 * 1024, backupCount=5, encoding='utf-8')
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+    except Exception:
+        pass
+
+    # Optional remote log collector via UDP: set SS_LOG_COLLECTOR=host:port
+    collector = os.getenv("SS_LOG_COLLECTOR")
+    if collector:
+        try:
+            host, port = collector.split(":")
+            dh = DatagramHandler(host, int(port))
+            logger.addHandler(dh)
+        except Exception:
+            pass
+
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
 
 class ScreenClient(QObject):
@@ -62,9 +97,19 @@ class ScreenClient(QObject):
             self.video_socket.settimeout(0.1)
             
             try:
+<<<<<<< Updated upstream
                 self.video_socket.bind(('0.0.0.0', VIDEO_PORT))
             except:
                 pass
+=======
+                # Bind to ephemeral port so multiple clients on same machine don't conflict
+                self.video_socket.bind(('0.0.0.0', 0))
+                local_port = self.video_socket.getsockname()[1]
+                logger.info(f"Bound video socket to 0.0.0.0:{local_port} (ephemeral)")
+            except Exception as e:
+                logger.exception(f"Could not bind video socket: {e}")
+                # continue; socket may still work for sends
+>>>>>>> Stashed changes
                 
             # Socket commandes TCP
             self.command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -78,9 +123,26 @@ class ScreenClient(QObject):
             self.receive_thread = threading.Thread(target=self._receive_video, daemon=True)
             self.receive_thread.start()
             
+<<<<<<< Updated upstream
             # Envoyer le message de démarrage
             self.video_socket.sendto(b'START', (server_ip, VIDEO_PORT))
             
+=======
+                # Inform the server which UDP port we listen on for video
+            try:
+                reg = {'type': 'register', 'video_port': self.video_socket.getsockname()[1]}
+                self.command_socket.sendall((json.dumps(reg) + '\n').encode('utf-8'))
+                logger.info(f"Sent register to server: {reg}")
+            except Exception as e:
+                logger.exception(f"Failed to send register to server: {e}")
+            # Also send START to signal readiness (server may ignore if using register)
+            try:
+                self.video_socket.sendto(b'START', (server_ip, VIDEO_PORT))
+                logger.debug(f"Sent START to {(server_ip, VIDEO_PORT)}")
+            except Exception:
+                logger.debug("Failed to send START (non-fatal)")
+        
+>>>>>>> Stashed changes
             self.status_changed.emit(f"Connecté à {server_ip}")
             self.connected.emit()
             

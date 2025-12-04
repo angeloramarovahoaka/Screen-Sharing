@@ -34,6 +34,12 @@ def main():
         default=1080,
         help="Hauteur de l'écran (défaut: 1080)"
     )
+    parser.add_argument(
+        "--log-collector",
+        type=str,
+        default=None,
+        help="Optional log collector in format host:port to forward logs"
+    )
     
     args = parser.parse_args()
     
@@ -51,6 +57,12 @@ def main():
     server = ScreenServer()
     server.screen_width = args.width
     server.screen_height = args.height
+
+    # If a log collector was provided, export env var so modules forward logs
+    if args.log_collector:
+        import os
+        os.environ['SS_LOG_COLLECTOR'] = args.log_collector
+        print(f"📣 Forwarding logs to collector: {args.log_collector}")
     
     # Connecter les signaux pour afficher les messages
     server.status_changed.connect(lambda s: print(f"📢 {s}"))

@@ -15,6 +15,10 @@ from pynput.mouse import Controller as MouseController, Button
 from pynput.keyboard import Controller as KeyboardController, Key
 import logging
 import os
+<<<<<<< Updated upstream
+=======
+from logging.handlers import RotatingFileHandler, DatagramHandler
+>>>>>>> Stashed changes
 
 try:
     import pyscreenshot as ImageGrab
@@ -23,15 +27,50 @@ except ImportError:
 
 from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, JPEG_QUALITY, DEFAULT_WIDTH
 
+<<<<<<< Updated upstream
 # Logger
 LOG_LEVEL = os.getenv("SS_LOG_LEVEL", "INFO").upper()
 logger = logging.getLogger("screenshare.server")
 if not logger.handlers:
+=======
+# --- Logging configuration ---
+LOG_LEVEL = os.getenv("SS_LOG_LEVEL", "INFO").upper()
+logger = logging.getLogger("screenshare.server")
+if not logger.handlers:
+    # Console handler
+>>>>>>> Stashed changes
     ch = logging.StreamHandler()
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
     ch.setFormatter(formatter)
     logger.addHandler(ch)
+<<<<<<< Updated upstream
 logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+=======
+
+    # File Rotating handler (logs/server.log)
+    try:
+        logs_dir = os.path.join(os.getcwd(), "logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        file_path = os.path.join(logs_dir, "server.log")
+        fh = RotatingFileHandler(file_path, maxBytes=5 * 1024 * 1024, backupCount=5, encoding='utf-8')
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+    except Exception:
+        pass
+
+    # Optional remote log collector via UDP: set SS_LOG_COLLECTOR=host:port
+    collector = os.getenv("SS_LOG_COLLECTOR")
+    if collector:
+        try:
+            host, port = collector.split(":")
+            dh = DatagramHandler(host, int(port))
+            logger.addHandler(dh)
+        except Exception:
+            pass
+
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+
+>>>>>>> Stashed changes
 
 class ScreenServer(QObject):
     """
