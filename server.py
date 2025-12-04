@@ -11,6 +11,7 @@ from pynput.mouse import Controller as MouseController, Button
 from pynput.keyboard import Controller as KeyboardController, Key 
 
 # --- CONFIGURATION RÉSEAU ---
+# ... (Configuration réseau inchangée) ...
 VIDEO_PORT = 9999
 COMMAND_PORT = 9998
 BUFFER_SIZE = 65536
