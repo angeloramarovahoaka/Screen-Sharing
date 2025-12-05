@@ -19,8 +19,8 @@ def main():
     parser.add_argument(
         "client_ip",
         nargs="?",
-        default="127.0.0.1",
-        help="Adresse IP du client qui recevra le flux (défaut: 127.0.0.1)"
+        default=None,
+        help="Optional: Adresse IP du client (informational only)"
     )
     parser.add_argument(
         "--width",
@@ -48,7 +48,7 @@ def main():
     print("=" * 50)
     print(f"📡 Port vidéo (UDP): {VIDEO_PORT}")
     print(f"📡 Port commandes (TCP): {COMMAND_PORT}")
-    print(f"🎯 Client cible: {args.client_ip}")
+    print(f"🎯 Client cible: {args.client_ip or 'aucun (écoute pour enregistrements)'}")
     print(f"📐 Résolution: {args.width}x{args.height}")
     print("=" * 50)
     print()
@@ -70,8 +70,10 @@ def main():
     server.client_disconnected.connect(lambda c: print(f"❌ Client déconnecté: {c}"))
     server.error_occurred.connect(lambda e: print(f"⚠️ Erreur: {e}"))
     
-    # Ajouter le client et démarrer
-    server.add_client(args.client_ip)
+    # Ne pas pré-ajouter de client ici. Le serveur attendra que les clients
+    # se connectent et envoient un message JSON {'type':'register','video_port':...}
+    # afin d'enregistrer leur port UDP. Cela évite les conflits de ports UDP
+    # lorsque plusieurs viewers se connectent.
     server.start(args.client_ip)
     
     print("▶️ Serveur démarré. Appuyez sur Ctrl+C pour arrêter.")

@@ -105,11 +105,18 @@ class ScreenServer(QObject):
         except AttributeError:
             return key_name
             
-    def start(self, client_ip):
-        """Démarre le serveur de partage d'écran"""
+    def start(self, client_ip=None):
+        """Démarre le serveur de partage d'écran.
+        Si `client_ip` est fourni, il est utilisé uniquement comme information d'affichage;
+        le serveur acceptera par défaut les connexions entrantes et attendra que les clients
+        s'enregistrent via le message `register`.
+        """
         self.client_ip = client_ip
         self.is_running = True
-        logger.info(f"Starting ScreenServer for client {client_ip}")
+        if client_ip:
+            logger.info(f"Starting ScreenServer for client {client_ip}")
+        else:
+            logger.info("Starting ScreenServer (accepting connections from any client)")
         
         # Démarrer le thread des commandes
         self.command_thread = threading.Thread(target=self._command_listener, daemon=True)
@@ -254,6 +261,15 @@ class ScreenServer(QObject):
                                 # Update mapping so we send video UDP to the provided port
                                 self.connected_clients[client_id] = (addr[0], video_port)
                                 logger.info(f"Registered client {client_id} -> {(addr[0], video_port)}")
+
+                                # Send an acknowledgement back to the client over TCP
+                                try:
+                                    ack = {'type': 'registered', 'status': 'ok', 'video_port': video_port}
+                                    conn.sendall((json.dumps(ack) + "\n").encode('utf-8'))
+                                    logger.debug(f"Sent register ACK to {client_id}")
+                                except Exception:
+                                    logger.debug(f"Failed to send ACK to {client_id}")
+
                             except Exception as e:
                                 logger.exception(f"Failed to process register from {client_id}: {e}")
                         else:

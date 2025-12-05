@@ -137,6 +137,29 @@ class ScreenClient(QObject):
                 logger.info(f"[CONNECT] Sent register to server: {reg} (server should send UDP to our port {bound_port})")
             except Exception as e:
                 logger.exception(f"Failed to send register to server: {e}")
+            # Try to read an optional ACK from the server on the command socket
+            try:
+                self.command_socket.settimeout(0.5)
+                ack_bytes = b''
+                try:
+                    ack_bytes = self.command_socket.recv(1024)
+                except socket.timeout:
+                    ack_bytes = b''
+                finally:
+                    # restore longer timeout
+                    self.command_socket.settimeout(5.0)
+
+                if ack_bytes:
+                    try:
+                        for line in ack_bytes.decode('utf-8').split('\n'):
+                            if not line.strip():
+                                continue
+                            ack = json.loads(line)
+                            logger.info(f"[CONNECT] Received ACK from server: {ack}")
+                    except Exception:
+                        logger.debug("[CONNECT] Received non-JSON ACK or partial data from server")
+            except Exception:
+                logger.debug("[CONNECT] No ACK received from server (non-fatal)")
             # Also send START to signal readiness (server may ignore if using register)
             try:
                 self.video_socket.sendto(b'START', (server_ip, VIDEO_PORT))
