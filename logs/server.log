@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 2025-12-05 02:43:51,985 [INFO] screenshare.server: Stopping ScreenServer
 2025-12-05 02:43:51,985 [INFO] screenshare.server: Serveur arrêté (signals emitted)
 2025-12-05 02:43:51,985 [INFO] screenshare.server: Stopping ScreenServer
@@ -31,3 +32,26 @@
 2025-12-05 02:54:56,202 [INFO] screenshare.server: Closed command connection for 192.168.11.19:52402
 2025-12-05 02:54:56,202 [INFO] screenshare.server: Stopping ScreenServer
 2025-12-05 02:54:56,202 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+=======
+2025-12-05 02:42:33,903 [INFO] screenshare.server: Starting ScreenServer for client 127.0.0.1
+2025-12-05 02:42:33,905 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 02:42:33,905 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 02:42:33,907 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 02:42:52,729 [INFO] screenshare.server: Accepted command connection from ('192.168.11.19', 52339); registered client_id=192.168.11.19:52339
+2025-12-05 02:42:52,742 [INFO] screenshare.server: Registered client 192.168.11.19:52339 -> ('192.168.11.19', 53556)
+2025-12-05 02:43:47,328 [INFO] screenshare.server: Closed command connection for 192.168.11.19:52339
+2025-12-05 02:43:54,054 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 02:43:54,054 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 02:45:22,472 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 02:45:22,473 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 02:45:22,474 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 02:45:22,474 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 02:46:53,221 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 02:46:53,222 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 02:46:53,223 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 02:46:53,223 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 02:50:26,858 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 02:50:26,860 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 02:50:26,861 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 02:50:26,862 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+>>>>>>> dadc871 (Add server log file to track ScreenServer activity and client connections)
