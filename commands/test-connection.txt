@@ -1,0 +1,1 @@
+Test-NetConnection -ComputerName 192.168.11.42 -Port 9998 -InformationLevel Detailed

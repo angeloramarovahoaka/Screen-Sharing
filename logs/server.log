@@ -82,3 +82,9 @@ OSError: [WinError 10038] Une opération a été tentée sur autre chose qu’un
 2025-12-05 07:44:31,845 [INFO] screenshare.server: Video streamer thread started
 2025-12-05 07:47:06,864 [INFO] screenshare.server: Stopping ScreenServer
 2025-12-05 07:47:06,864 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 07:58:31,670 [INFO] screenshare.server: Starting ScreenServer for client 192.168.11.42
+2025-12-05 07:58:31,670 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 07:58:31,670 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 07:58:31,670 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 08:05:08,236 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 08:05:08,236 [INFO] screenshare.server: Serveur arrêté (signals emitted)
