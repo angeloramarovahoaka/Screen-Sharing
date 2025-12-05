@@ -24,20 +24,15 @@ except ImportError:
 
 from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, JPEG_QUALITY, DEFAULT_WIDTH
 
-# Logger
+# --- Logging configuration ---
 LOG_LEVEL = os.getenv("SS_LOG_LEVEL", "INFO").upper()
 logger = logging.getLogger("screenshare.server")
-if not logger.handlers:
-    # --- Logging configuration ---
-    LOG_LEVEL = os.getenv("SS_LOG_LEVEL", "INFO").upper()
-    logger = logging.getLogger("screenshare.server")
 if not logger.handlers:
     # Console handler
     ch = logging.StreamHandler()
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
     ch.setFormatter(formatter)
     logger.addHandler(ch)
-    logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
     # File Rotating handler (logs/server.log)
     try:
@@ -149,11 +144,6 @@ class ScreenServer(QObject):
         
     def _video_streamer(self):
         """Thread de streaming vidéo"""
-        frame_count = 0
-        last_log_time = time.time()
-        # Chunk size for UDP fragmentation (under MTU of 1500)
-        CHUNK_SIZE = 1400
-        
         try:
             self.video_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.status_changed.emit("Streaming vidéo démarré")
@@ -172,46 +162,15 @@ class ScreenServer(QObject):
                         '.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY]
                     )
                     b64encoded = base64.b64encode(buffer)
-                    packet_size = len(b64encoded)
-                    
-                    # Log périodique de l'état des clients (toutes les 5 secondes)
-                    now = time.time()
-                    if now - last_log_time >= 5.0:
-                        logger.info(f"[VIDEO] Frame #{frame_count}, packet_size={packet_size}, connected_clients={dict(self.connected_clients)}")
-                        last_log_time = now
-                    
-                    # Fragment the frame into chunks for UDP transmission
-                    # Header format: "FRAME:frame_id:chunk_idx:total_chunks:"
-                    total_chunks = (packet_size + CHUNK_SIZE - 1) // CHUNK_SIZE
                     
                     # Envoi à tous les clients connectés
-                    clients_snapshot = list(self.connected_clients.items())
-                    if not clients_snapshot:
-                        logger.debug("[VIDEO] No clients connected, skipping send")
-                    
-                    for client_id, client_addr in clients_snapshot:
+                    for client_id, client_addr in list(self.connected_clients.items()):
                         try:
-                            # Send each chunk with header
-                            for chunk_idx in range(total_chunks):
-                                start = chunk_idx * CHUNK_SIZE
-                                end = min(start + CHUNK_SIZE, packet_size)
-                                chunk_data = b64encoded[start:end]
-                                
-                                # Create packet with header
-                                header = f"FRAME:{frame_count}:{chunk_idx}:{total_chunks}:".encode('utf-8')
-                                packet = header + chunk_data
-                                
-                                sent = self.video_socket.sendto(packet, client_addr)
-                                if chunk_idx == 0:
-                                    logger.debug(f"[VIDEO] Sent frame #{frame_count} chunk 0/{total_chunks} to {client_addr} (chunk_size={len(chunk_data)})")
+                            sent = self.video_socket.sendto(b64encoded, client_addr)
+                            logger.debug(f"Sent video packet to {client_addr} ({len(b64encoded)} bytes) -> sendto returned {sent}")
                         except Exception as e:
-                            logger.error(f"[VIDEO] Error sending to {client_addr}: {e}")
+                            logger.exception(f"Erreur en envoyant vers {client_addr}: {e}")
                             # Ne pas supprimer le client automatiquement; laisser la logique de socket gérer
-                    
-                    frame_count += 1
-                    
-                    # Small delay to not flood the network
-                    time.sleep(0.03)  # ~30 FPS max
                             
                 except Exception as e:
                     logger.debug(f"Erreur dans video_streamer loop: {e}")
