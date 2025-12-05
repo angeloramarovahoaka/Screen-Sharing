@@ -102,16 +102,50 @@ class ScreenClient(QObject):
                 self.video_socket.bind(('0.0.0.0', 0))
                 bound_addr = self.video_socket.getsockname()
                 logger.info(f"[CONNECT] UDP video socket bound to {bound_addr}")
-            except Exception:
-                # If bind fails, continue; we'll still attempt to use the socket.
-                logger.exception("Failed to bind video socket to ephemeral port")
+            except Exception as e:
+                logger.warning(f"Failed to bind video socket to ephemeral port: {e}")
+                # Continue anyway
                 
-            # Socket commandes TCP
+            # Socket commandes TCP avec retry pour Windows
             logger.info(f"[CONNECT] Connecting TCP command socket to {server_ip}:{COMMAND_PORT}...")
             self.command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.command_socket.settimeout(5.0)
-            self.command_socket.connect((server_ip, COMMAND_PORT))
-            logger.info(f"[CONNECT] TCP connected! Local addr: {self.command_socket.getsockname()}")
+            self.command_socket.settimeout(10.0)  # Augmenté à 10s pour Windows
+            
+            # Retry logic pour connexion TCP (Windows peut être plus lent)
+            max_retries = 3
+            last_error = None
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"[CONNECT] TCP connection attempt {attempt + 1}/{max_retries}...")
+                    self.command_socket.connect((server_ip, COMMAND_PORT))
+                    logger.info(f"[CONNECT] TCP connected! Local addr: {self.command_socket.getsockname()}")
+                    break
+                except socket.timeout as e:
+                    last_error = f"Timeout de connexion après 10s (tentative {attempt + 1}/{max_retries}). Le serveur sur {server_ip}:{COMMAND_PORT} ne répond pas."
+                    logger.warning(last_error)
+                    if attempt < max_retries - 1:
+                        time.sleep(1)
+                    else:
+                        raise ConnectionError(last_error) from e
+                except ConnectionRefusedError as e:
+                    last_error = f"Connexion refusée sur {server_ip}:{COMMAND_PORT}. Le serveur n'écoute pas sur ce port ou le pare-feu bloque la connexion."
+                    logger.error(last_error)
+                    if attempt < max_retries - 1:
+                        time.sleep(1)
+                    else:
+                        raise ConnectionError(last_error) from e
+                except OSError as e:
+                    if e.errno == 10061:  # Windows: No connection could be made
+                        last_error = f"Le serveur {server_ip}:{COMMAND_PORT} refuse activement la connexion. Vérifiez que run_server.py est lancé et que le pare-feu Windows autorise le port {COMMAND_PORT}."
+                    elif e.errno == 113:  # Linux: No route to host
+                        last_error = f"Impossible de joindre {server_ip}. Vérifiez le réseau et le pare-feu."
+                    else:
+                        last_error = f"Erreur réseau ({e.errno}): {e}"
+                    logger.error(last_error)
+                    if attempt < max_retries - 1:
+                        time.sleep(1)
+                    else:
+                        raise ConnectionError(last_error) from e
             
             self.is_connected = True
             self.is_running = True
@@ -172,8 +206,17 @@ class ScreenClient(QObject):
             
             return True
             
+        except ConnectionError as e:
+            # Erreur de connexion avec message détaillé
+            error_msg = str(e)
+            logger.error(f"[CONNECT] Connection failed: {error_msg}")
+            self.error_occurred.emit(f"Erreur de connexion: {error_msg}")
+            self.disconnect()
+            return False
         except Exception as e:
-            self.error_occurred.emit(f"Erreur de connexion: {e}")
+            error_msg = f"Erreur inattendue: {type(e).__name__}: {e}"
+            logger.exception(f"[CONNECT] Unexpected error: {error_msg}")
+            self.error_occurred.emit(f"Erreur de connexion: {error_msg}")
             self.disconnect()
             return False
             

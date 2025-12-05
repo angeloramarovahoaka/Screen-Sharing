@@ -195,10 +195,17 @@ class ScreenServer(QObject):
         try:
             self.command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.command_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.command_socket.bind(('0.0.0.0', COMMAND_PORT))
+            
+            # Bind avec logging explicite pour diagnostic
+            bind_address = ('0.0.0.0', COMMAND_PORT)
+            logger.info(f"Attempting to bind command socket to {bind_address}...")
+            self.command_socket.bind(bind_address)
+            actual_address = self.command_socket.getsockname()
+            logger.info(f"Successfully bound to {actual_address}")
+            
             self.command_socket.listen(5)
             self.status_changed.emit(f"Écoute commandes sur port {COMMAND_PORT}")
-            logger.info(f"Listening for command connections on 0.0.0.0:{COMMAND_PORT}")
+            logger.info(f"Listening for command connections on {actual_address} (accessible from network at 0.0.0.0:{COMMAND_PORT})")
             
             while self.is_running:
                 try:
