@@ -64,3 +64,15 @@
 2025-12-05 03:08:25,042 [INFO] screenshare.server: Closed command connection for 192.168.11.19:56869
 2025-12-05 03:08:35,028 [INFO] screenshare.server: Stopping ScreenServer
 2025-12-05 03:08:35,029 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 08:11:28,879 [INFO] screenshare.server: Starting ScreenServer for client 192.168.11.42
+2025-12-05 08:11:28,879 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 08:11:28,879 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 08:11:28,879 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 08:11:37,350 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 08:11:37,350 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 08:11:41,657 [INFO] screenshare.server: Starting ScreenServer for client 192.168.11.122
+2025-12-05 08:11:41,673 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 08:11:41,673 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 08:11:41,673 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 08:27:21,340 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 08:27:21,340 [INFO] screenshare.server: Serveur arrêté (signals emitted)
