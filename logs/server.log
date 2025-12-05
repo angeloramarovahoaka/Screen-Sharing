@@ -85,3 +85,7 @@
 2025-12-05 08:59:33,030 [INFO] screenshare.server: Serveur démarré (signals emitted)
 2025-12-05 09:04:04,469 [INFO] screenshare.server: Stopping ScreenServer
 2025-12-05 09:04:04,470 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 09:13:39,508 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 09:13:39,508 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 09:13:39,509 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 09:13:39,510 [INFO] screenshare.server: Serveur arrêté (signals emitted)
