@@ -1,0 +1,2 @@
+2025-12-05 02:42:57,399 [INFO] screenshare.client: Sent register to server: {'type': 'register', 'video_port': 53556}
+2025-12-05 02:54:48,405 [INFO] screenshare.client: Sent register to server: {'type': 'register', 'video_port': 64854}

@@ -7,12 +7,15 @@ import os
 VIDEO_PORT = 9999
 COMMAND_PORT = 9998
 AUDIO_PORT = 9997
-BUFFER_SIZE = 65536
+# Buffer UDP assez grand pour recevoir les frames (max ~65KB pour UDP)
+BUFFER_SIZE = 131072  # 128KB buffer for socket recv
 
 # --- CONFIGURATION VIDÉO ---
+# Résolution réduite pour garder les paquets UDP sous ~60KB
 DEFAULT_WIDTH = 640
 DEFAULT_HEIGHT = 360
-JPEG_QUALITY = 70
+# Qualité JPEG réduite pour des paquets plus petits
+JPEG_QUALITY = 50  # Lower quality = smaller packets, better cross-network performance
 
 # --- CONFIGURATION AUDIO ---
 AUDIO_RATE = 44100
