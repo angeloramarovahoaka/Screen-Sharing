@@ -64,3 +64,21 @@
 2025-12-05 03:08:25,042 [INFO] screenshare.server: Closed command connection for 192.168.11.19:56869
 2025-12-05 03:08:35,028 [INFO] screenshare.server: Stopping ScreenServer
 2025-12-05 03:08:35,029 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 07:43:13,463 [INFO] screenshare.server: Starting ScreenServer for client 127.0.0.1
+2025-12-05 07:43:13,463 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 07:43:13,463 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 07:43:13,463 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 07:43:17,006 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 07:43:17,006 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 07:43:17,034 [ERROR] screenshare.server: Erreur en envoyant vers ('127.0.0.1', 9999): [WinError 10038] Une opération a été tentée sur autre chose qu’un socket
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] Une opération a été tentée sur autre chose qu’un socket
+2025-12-05 07:44:31,845 [INFO] screenshare.server: Starting ScreenServer for client 192.168.11.24
+2025-12-05 07:44:31,845 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 07:44:31,845 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 07:44:31,845 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 07:47:06,864 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 07:47:06,864 [INFO] screenshare.server: Serveur arrêté (signals emitted)
