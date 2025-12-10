@@ -64,3 +64,305 @@
 2025-12-05 03:08:25,042 [INFO] screenshare.server: Closed command connection for 192.168.11.19:56869
 2025-12-05 03:08:35,028 [INFO] screenshare.server: Stopping ScreenServer
 2025-12-05 03:08:35,029 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 09:44:06,004 [INFO] screenshare.server: Starting ScreenServer for client 127.0.0.1
+2025-12-05 09:44:06,004 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 09:44:06,004 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 09:44:06,004 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 09:44:44,188 [INFO] screenshare.server: Accepted command connection from ('127.0.0.1', 57210); registered client_id=127.0.0.1:57210
+2025-12-05 09:44:44,188 [INFO] screenshare.server: Registered client 127.0.0.1:57210 -> ('127.0.0.1', 62435)
+2025-12-05 09:45:50,227 [INFO] screenshare.server: Closed command connection for 127.0.0.1:57210
+2025-12-05 09:47:49,853 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 09:47:49,853 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 09:47:57,140 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 09:47:57,140 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 09:48:14,434 [INFO] screenshare.server: Starting ScreenServer for client 192.168.11.122
+2025-12-05 09:48:14,434 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 09:48:14,434 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 09:48:14,434 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 09:56:30,843 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 09:56:30,844 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 11:08:28,310 [INFO] screenshare.server: Starting ScreenServer for client 127.0.0.1
+2025-12-05 11:08:28,312 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 11:08:28,312 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 11:08:28,312 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 11:08:43,768 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 11:08:43,768 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 11:09:15,241 [INFO] screenshare.server: Starting ScreenServer for client 192.168.11.42
+2025-12-05 11:09:15,241 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 11:09:15,241 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 11:09:15,241 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 11:09:55,724 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.11.42', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-05 11:09:56,041 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.11.42', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-05 11:09:56,268 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.11.42', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-05 11:10:31,900 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 11:10:31,900 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 11:10:59,232 [INFO] screenshare.server: Starting ScreenServer for client 192.168.11.42
+2025-12-05 11:10:59,233 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 11:10:59,233 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 11:10:59,234 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 11:12:05,613 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 11:12:05,613 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 11:12:05,643 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.11.42', 9999): [WinError 10038] Une opération a été tentée sur autre chose qu’un socket
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] Une opération a été tentée sur autre chose qu’un socket
+2025-12-05 11:15:02,238 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 11:15:02,238 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 11:15:02,238 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 11:15:02,238 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 11:45:47,198 [INFO] screenshare.server: Starting ScreenServer for client 192.168.11.42
+2025-12-05 11:45:47,198 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 11:45:47,198 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 11:45:47,198 [INFO] screenshare.server: Video streamer thread started
+                                                                                                                                                                 2025-12-05 11:53:14,407 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 11:53:14,407 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 11:53:14,407 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 11:53:14,407 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 11:56:26,948 [INFO] screenshare.server: Starting ScreenServer for client 127.0.0.1
+2025-12-05 11:56:26,948 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 11:56:26,948 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 11:56:26,948 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 11:58:58,197 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 11:58:58,197 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 11:58:58,197 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 11:58:58,197 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 12:01:40,828 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 12:01:40,828 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 12:01:40,830 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 12:01:40,830 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 12:02:45,798 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 12:02:45,798 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 12:02:45,798 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 12:02:45,798 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 12:03:24,417 [INFO] screenshare.server: Starting ScreenServer for client 192.168.11.42
+2025-12-05 12:03:24,417 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 12:03:24,417 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 12:03:24,417 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 12:04:26,511 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 12:04:26,511 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 12:04:29,866 [INFO] screenshare.server: Starting ScreenServer for client 127.0.0.1
+2025-12-05 12:04:29,866 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 12:04:29,866 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 12:04:29,866 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 12:04:35,547 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 12:04:35,547 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 12:05:02,973 [INFO] screenshare.server: Accepted command connection from ('127.0.0.1', 63909); registered client_id=127.0.0.1:63909
+2025-12-05 12:05:02,973 [INFO] screenshare.server: Registered client 127.0.0.1:63909 -> ('127.0.0.1', 63019)
+2025-12-05 12:05:41,725 [INFO] screenshare.server: Starting ScreenServer for client 192.168.11.42
+2025-12-05 12:05:41,727 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-05 12:05:41,727 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-05 12:05:41,727 [INFO] screenshare.server: Video streamer thread started
+2025-12-05 12:06:30,192 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 12:06:30,192 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 12:06:30,359 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.11.42', 9999): [WinError 10038] Une opération a été tentée sur autre chose qu’un socket
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10038] Une opération a été tentée sur autre chose qu’un socket
+2025-12-05 12:07:18,369 [INFO] screenshare.server: Closed command connection for 127.0.0.1:63909
+2025-12-05 12:07:18,369 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 12:07:18,369 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-05 12:07:18,369 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-05 12:07:18,369 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-06 06:59:32,053 [INFO] screenshare.server: Starting ScreenServer for client 192.168.11.122
+2025-12-06 06:59:32,054 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-06 06:59:32,054 [INFO] screenshare.server: Video streamer thread started
+2025-12-06 06:59:32,054 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-06 07:07:04,899 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-06 07:07:04,900 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-06 07:07:07,127 [INFO] screenshare.server: Starting ScreenServer for client 192.168.11.122
+2025-12-06 07:07:07,127 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-06 07:07:07,127 [INFO] screenshare.server: Video streamer thread started
+2025-12-06 07:07:07,127 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-06 07:07:32,182 [INFO] screenshare.server: Accepted command connection from ('192.168.11.122', 54158); registered client_id=192.168.11.122:54158
+2025-12-06 07:07:32,185 [INFO] screenshare.server: Registered client 192.168.11.122:54158 -> ('192.168.11.122', 41315)
+2025-12-08 13:54:01,048 [INFO] screenshare.server: Starting ScreenServer for client 127.0.0.1
+2025-12-08 13:54:01,048 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-08 13:54:01,048 [INFO] screenshare.server: Video streamer thread started
+2025-12-08 13:54:01,048 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-08 13:55:44,875 [INFO] screenshare.server: Accepted command connection from ('127.0.0.1', 63483); registered client_id=127.0.0.1:63483
+2025-12-08 13:55:44,875 [INFO] screenshare.server: Registered client 127.0.0.1:63483 -> ('127.0.0.1', 58205)
+2025-12-08 13:56:29,732 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-08 13:56:29,733 [INFO] screenshare.server: Closed command connection for 127.0.0.1:63483
+2025-12-08 13:56:29,733 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-08 13:56:29,734 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-08 13:56:29,734 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-08 13:56:32,334 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-08 13:56:32,334 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-08 14:05:25,374 [INFO] screenshare.server: Starting ScreenServer for client 192.168.2.86
+2025-12-08 14:05:25,374 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-08 14:05:25,374 [INFO] screenshare.server: Video streamer thread started
+2025-12-08 14:05:25,374 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-08 14:07:27,655 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:27,956 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:28,183 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:28,393 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:28,627 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:28,866 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:29,155 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:29,417 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:29,644 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:29,860 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:30,070 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:30,285 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:30,511 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:30,711 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:30,933 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:31,155 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:31,379 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:31,608 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:31,839 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:32,064 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:32,284 [ERROR] screenshare.server: Erreur en envoyant vers ('192.168.2.86', 9999): [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+Traceback (most recent call last):
+  File "C:\Users\PRODIGY\Documents\Screen-Sharing\app\server_module.py", line 169, in _video_streamer
+    sent = self.video_socket.sendto(b64encoded, client_addr)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 10051] Une opération a été tentée sur un réseau impossible à atteindre
+2025-12-08 14:07:57,104 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-08 14:07:57,105 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-08 14:08:00,451 [INFO] screenshare.server: Starting ScreenServer for client 192.168.2.86
+2025-12-08 14:08:00,451 [INFO] screenshare.server: Serveur démarré (signals emitted)
+2025-12-08 14:08:00,451 [INFO] screenshare.server: Video streamer thread started
+2025-12-08 14:08:00,451 [INFO] screenshare.server: Listening for command connections on 0.0.0.0:9998
+2025-12-08 14:09:03,487 [INFO] screenshare.server: Accepted command connection from ('192.168.11.107', 50804); registered client_id=192.168.11.107:50804
+2025-12-08 14:09:03,488 [INFO] screenshare.server: Registered client 192.168.11.107:50804 -> ('192.168.11.107', 54252)
+2025-12-08 14:11:10,189 [WARNING] screenshare.server: JSON decode error for: {"type": "mouse
+2025-12-08 14:11:10,189 [WARNING] screenshare.server: JSON decode error for: ", "action": "scroll", "dx": 0, "dy": -1}
+2025-12-08 14:11:10,191 [WARNING] screenshare.server: JSON decode error for: {"type": "mouse", "action": "scroll", "d
+2025-12-08 14:11:10,511 [WARNING] screenshare.server: JSON decode error for: x": 0, "dy": -1}
+2025-12-08 14:11:23,446 [INFO] screenshare.server: Closed command connection for 192.168.11.107:50804
+2025-12-08 14:11:29,285 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-08 14:11:29,285 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-08 14:13:22,984 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-08 14:13:22,984 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-08 14:13:22,984 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-08 14:13:22,984 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-08 14:18:09,268 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-08 14:18:09,268 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-08 14:30:40,969 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-08 14:30:40,969 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-08 14:30:40,969 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-08 14:30:40,969 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-08 14:33:03,220 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-08 14:33:03,220 [INFO] screenshare.server: Serveur arrêté (signals emitted)
+2025-12-08 14:33:03,248 [INFO] screenshare.server: Stopping ScreenServer
+2025-12-08 14:33:03,248 [INFO] screenshare.server: Serveur arrêté (signals emitted)
