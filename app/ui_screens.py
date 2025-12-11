@@ -465,6 +465,9 @@ class ScreenViewer(QWidget):
             # Envoyer la touche principale
             key_name = self._get_key_name(event)
             if key_name:
+                # Debug temporaire pour les touches directionnelles
+                if key_name in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down', 'left', 'up', 'right', 'down']:
+                    print(f"DEBUG: Sending arrow key: {key_name}")
                 self.client.send_command({
                     'type': 'key',
                     'action': 'press',

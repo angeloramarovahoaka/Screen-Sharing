@@ -126,8 +126,8 @@ class ScreenServer(QObject):
                 'arrow_down': self.VK_DOWN
             }
             if direction in vk_codes:
+                print(f"DEBUG: Pressing {direction} with ctypes, VK={vk_codes[direction]}")
                 ctypes.windll.user32.keybd_event(vk_codes[direction], 0, 0, 0)
-                logger.debug(f"Pressed arrow key {direction} via Win32 API")
                 return True
         return False
     
@@ -141,8 +141,8 @@ class ScreenServer(QObject):
                 'arrow_down': self.VK_DOWN
             }
             if direction in vk_codes:
+                print(f"DEBUG: Releasing {direction} with ctypes, VK={vk_codes[direction]}")
                 ctypes.windll.user32.keybd_event(vk_codes[direction], 0, self.KEYEVENTF_KEYUP, 0)
-                logger.debug(f"Released arrow key {direction} via Win32 API")
                 return True
         return False
         
@@ -468,6 +468,10 @@ class ScreenServer(QObject):
             else:
                 key_names = [command['key']]
             for key_name in key_names:
+                # Debug temporaire pour les touches directionnelles
+                if key_name in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down', 'left', 'up', 'right', 'down']:
+                    print(f"DEBUG SERVER: Processing arrow key: {key_name}, action: {action}")
+                
                 # Gestion spéciale des touches directionnelles sur Windows
                 arrow_keys = ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down']
                 if key_name in arrow_keys:
@@ -509,3 +513,33 @@ class ScreenServer(QObject):
         if client_id in self.connected_clients:
             del self.connected_clients[client_id]
             self.client_disconnected.emit(client_id)
+    
+    def _press_arrow_key(self, direction):
+        """Appuie sur une touche directionnelle en utilisant l'API Windows native"""
+        if platform.system() == 'Windows':
+            vk_codes = {
+                'arrow_left': self.VK_LEFT,
+                'arrow_up': self.VK_UP,
+                'arrow_right': self.VK_RIGHT,
+                'arrow_down': self.VK_DOWN
+            }
+            if direction in vk_codes:
+                print(f"DEBUG: Pressing {direction} with ctypes, VK={vk_codes[direction]}")
+                ctypes.windll.user32.keybd_event(vk_codes[direction], 0, 0, 0)
+                return True
+        return False
+    
+    def _release_arrow_key(self, direction):
+        """Relâche une touche directionnelle en utilisant l'API Windows native"""
+        if platform.system() == 'Windows':
+            vk_codes = {
+                'arrow_left': self.VK_LEFT,
+                'arrow_up': self.VK_UP,
+                'arrow_right': self.VK_RIGHT,
+                'arrow_down': self.VK_DOWN
+            }
+            if direction in vk_codes:
+                print(f"DEBUG: Releasing {direction} with ctypes, VK={vk_codes[direction]}")
+                ctypes.windll.user32.keybd_event(vk_codes[direction], 0, self.KEYEVENTF_KEYUP, 0)
+                return True
+        return False
