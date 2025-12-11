@@ -331,18 +331,27 @@ class MainWindow(QMainWindow):
             
         client = self.multi_client.clients[screen_id]
         
-        # Créer le viewer
+        # Nettoyer complètement l'ancien viewer s'il existe
+        if self.current_zoomed_screen and self.current_zoomed_screen in self.screen_viewers:
+            old_viewer = self.screen_viewers[self.current_zoomed_screen]
+            # Déconnecter les signaux
+            old_client = self.multi_client.clients.get(self.current_zoomed_screen)
+            if old_client:
+                try:
+                    old_client.frame_received.disconnect(old_viewer.update_frame)
+                except:
+                    pass
+            # Retirer du layout et supprimer
+            self.zoom_layout.removeWidget(old_viewer)
+            old_viewer.deleteLater()
+            del self.screen_viewers[self.current_zoomed_screen]
+        
+        # Créer le nouveau viewer
         viewer = ScreenViewer(screen_id, client)
         viewer.close_requested.connect(self.close_zoom)
         
         # Connecter les frames
         client.frame_received.connect(viewer.update_frame)
-        
-        # Nettoyer l'ancien viewer
-        if self.current_zoomed_screen and self.current_zoomed_screen in self.screen_viewers:
-            old_viewer = self.screen_viewers[self.current_zoomed_screen]
-            self.zoom_layout.removeWidget(old_viewer)
-            old_viewer.deleteLater()
             
         # Ajouter le nouveau
         self.zoom_layout.addWidget(viewer)
@@ -354,6 +363,21 @@ class MainWindow(QMainWindow):
         
     def close_zoom(self):
         """Ferme la vue zoom et revient à la liste"""
+        # Nettoyer complètement le viewer actuel
+        if self.current_zoomed_screen and self.current_zoomed_screen in self.screen_viewers:
+            viewer = self.screen_viewers[self.current_zoomed_screen]
+            # Déconnecter les signaux
+            client = self.multi_client.clients.get(self.current_zoomed_screen)
+            if client:
+                try:
+                    client.frame_received.disconnect(viewer.update_frame)
+                except:
+                    pass
+            # Retirer du layout et supprimer
+            self.zoom_layout.removeWidget(viewer)
+            viewer.deleteLater()
+            del self.screen_viewers[self.current_zoomed_screen]
+        
         self.content_stack.setCurrentIndex(0)
         self.current_zoomed_screen = None
         
