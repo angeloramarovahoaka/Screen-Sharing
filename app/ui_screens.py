@@ -464,7 +464,13 @@ class ScreenViewer(QWidget):
             Qt.Key_Shift: 'shift',
             Qt.Key_Control: 'ctrl',
             Qt.Key_Alt: 'alt',
+            Qt.Key_Meta: 'cmd',  # Touche Windows/Command
+            Qt.Key_Super_L: 'cmd',  # Windows gauche
+            Qt.Key_Super_R: 'cmd_r',  # Windows droit
             Qt.Key_CapsLock: 'caps_lock',
+            Qt.Key_Insert: 'insert',
+            Qt.Key_Pause: 'pause',
+            Qt.Key_Print: 'print_screen',
             Qt.Key_F1: 'f1',
             Qt.Key_F2: 'f2',
             Qt.Key_F3: 'f3',

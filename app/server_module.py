@@ -104,10 +104,58 @@ class ScreenServer(QObject):
         
     def get_pynput_key(self, key_name):
         """Convertit une chaîne en objet pynput Key ou caractère."""
-        try:
-            return getattr(Key, key_name)
-        except AttributeError:
-            return key_name
+        # Mapping explicite pour les touches spéciales
+        key_mapping = {
+            'enter': Key.enter,
+            'backspace': Key.backspace,
+            'tab': Key.tab,
+            'esc': Key.esc,
+            'space': Key.space,
+            'delete': Key.delete,
+            'home': Key.home,
+            'end': Key.end,
+            'left': Key.left,
+            'right': Key.right,
+            'up': Key.up,
+            'down': Key.down,
+            'page_up': Key.page_up,
+            'page_down': Key.page_down,
+            'shift': Key.shift,
+            'shift_l': Key.shift_l,
+            'shift_r': Key.shift_r,
+            'ctrl': Key.ctrl,
+            'ctrl_l': Key.ctrl_l,
+            'ctrl_r': Key.ctrl_r,
+            'alt': Key.alt,
+            'alt_l': Key.alt_l,
+            'alt_r': Key.alt_r,
+            'cmd': Key.cmd,  # Touche Windows/Command
+            'cmd_l': Key.cmd,
+            'cmd_r': Key.cmd_r,
+            'caps_lock': Key.caps_lock,
+            'insert': Key.insert,
+            'pause': Key.pause,
+            'print_screen': Key.print_screen,
+            'f1': Key.f1,
+            'f2': Key.f2,
+            'f3': Key.f3,
+            'f4': Key.f4,
+            'f5': Key.f5,
+            'f6': Key.f6,
+            'f7': Key.f7,
+            'f8': Key.f8,
+            'f9': Key.f9,
+            'f10': Key.f10,
+            'f11': Key.f11,
+            'f12': Key.f12,
+        }
+        
+        # Chercher dans le mapping
+        if key_name in key_mapping:
+            return key_mapping[key_name]
+        
+        # Sinon, retourner le caractère tel quel (pour les lettres, chiffres, etc.)
+        return key_name
             
     def start(self, client_ip):
         """Démarre le serveur (écoute commandes seulement, pas de streaming auto)"""
