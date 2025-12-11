@@ -7,10 +7,10 @@ BUFFER_SIZE = 65536
 SERVER_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 SERVER_SOCKET.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFFER_SIZE)
 HOST_NAME = socket.gethostname()
-HOST_IP = "192.168.11.122"
+HOST_IP = socket.gethostbyname(HOST_NAME)
 print("HOST IP:", HOST_IP)
 PORT = 9999
-socket_address = (HOST_IP, PORT)
+socket_address = ('0.0.0.0', PORT)  # Bind to all interfaces
 SERVER_SOCKET.bind(socket_address)
 print("Listening at:", socket_address)
 vid = cv2.VideoCapture(0)
