@@ -164,6 +164,9 @@ class ScreenViewer(QWidget):
         self.zoom_level = 1.0
         self.is_controlling = True
         
+        # Tracker l'état des touches modificatrices pour éviter de les envoyer plusieurs fois
+        self.pressed_modifiers = set()
+        
         self.setFocusPolicy(Qt.StrongFocus)
         self.setMouseTracking(True)
         self.setup_ui()
@@ -327,6 +330,22 @@ class ScreenViewer(QWidget):
                     padding: 5px 10px;
                 }
             """)
+            # Relâcher tous les modificateurs quand on désactive le contrôle
+            self._release_all_modifiers()
+    
+    def _release_all_modifiers(self):
+        """Relâche toutes les touches modificatrices pressées"""
+        if not self.client:
+            return
+            
+        for modifier in list(self.pressed_modifiers):
+            self.client.send_command({'type': 'key', 'action': 'release', 'key': modifier})
+        self.pressed_modifiers.clear()
+    
+    def focusOutEvent(self, event):
+        """Appelé quand la fenêtre perd le focus - relâcher les modificateurs"""
+        self._release_all_modifiers()
+        super().focusOutEvent(event)
             
     def _get_normalized_position(self, pos):
         """Convertit la position en coordonnées normalisées"""
@@ -418,6 +437,32 @@ class ScreenViewer(QWidget):
     def keyPressEvent(self, event: QKeyEvent):
         """Gère les appuis de touches"""
         if self.is_controlling and self.client:
+            modifiers = event.modifiers()
+            key = event.key()
+            
+            # Vérifier si c'est une touche modificatrice elle-même
+            is_modifier_key = key in [Qt.Key_Control, Qt.Key_Shift, Qt.Key_Alt, Qt.Key_Meta, 
+                                      Qt.Key_Super_L, Qt.Key_Super_R]
+            
+            if not is_modifier_key:
+                # C'est une touche normale, envoyer les modificateurs actifs d'abord (une seule fois)
+                if (modifiers & Qt.ControlModifier) and 'ctrl' not in self.pressed_modifiers:
+                    self.client.send_command({'type': 'key', 'action': 'press', 'key': 'ctrl'})
+                    self.pressed_modifiers.add('ctrl')
+                    
+                if (modifiers & Qt.ShiftModifier) and 'shift' not in self.pressed_modifiers:
+                    self.client.send_command({'type': 'key', 'action': 'press', 'key': 'shift'})
+                    self.pressed_modifiers.add('shift')
+                    
+                if (modifiers & Qt.AltModifier) and 'alt' not in self.pressed_modifiers:
+                    self.client.send_command({'type': 'key', 'action': 'press', 'key': 'alt'})
+                    self.pressed_modifiers.add('alt')
+                    
+                if (modifiers & Qt.MetaModifier) and 'cmd' not in self.pressed_modifiers:
+                    self.client.send_command({'type': 'key', 'action': 'press', 'key': 'cmd'})
+                    self.pressed_modifiers.add('cmd')
+            
+            # Envoyer la touche principale
             key_name = self._get_key_name(event)
             if key_name:
                 self.client.send_command({
@@ -425,11 +470,15 @@ class ScreenViewer(QWidget):
                     'action': 'press',
                     'key': key_name
                 })
+                
         super().keyPressEvent(event)
         
     def keyReleaseEvent(self, event: QKeyEvent):
         """Gère les relâchements de touches"""
         if self.is_controlling and self.client:
+            key = event.key()
+            
+            # Envoyer le relâchement de la touche principale
             key_name = self._get_key_name(event)
             if key_name:
                 self.client.send_command({
@@ -437,6 +486,24 @@ class ScreenViewer(QWidget):
                     'action': 'release',
                     'key': key_name
                 })
+            
+            # Si c'est une touche modificatrice qui est relâchée, la retirer du tracker
+            if key == Qt.Key_Control and 'ctrl' in self.pressed_modifiers:
+                self.client.send_command({'type': 'key', 'action': 'release', 'key': 'ctrl'})
+                self.pressed_modifiers.discard('ctrl')
+                
+            elif key == Qt.Key_Shift and 'shift' in self.pressed_modifiers:
+                self.client.send_command({'type': 'key', 'action': 'release', 'key': 'shift'})
+                self.pressed_modifiers.discard('shift')
+                
+            elif key == Qt.Key_Alt and 'alt' in self.pressed_modifiers:
+                self.client.send_command({'type': 'key', 'action': 'release', 'key': 'alt'})
+                self.pressed_modifiers.discard('alt')
+                
+            elif key in [Qt.Key_Meta, Qt.Key_Super_L, Qt.Key_Super_R] and 'cmd' in self.pressed_modifiers:
+                self.client.send_command({'type': 'key', 'action': 'release', 'key': 'cmd'})
+                self.pressed_modifiers.discard('cmd')
+                
         super().keyReleaseEvent(event)
         
     def _get_key_name(self, event: QKeyEvent):
