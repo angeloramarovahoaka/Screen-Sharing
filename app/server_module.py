@@ -81,6 +81,7 @@ class ScreenServer(QObject):
         
         # État
         self.is_running = False
+        self.is_streaming = False  # Contrôle si le streaming vidéo est actif
         self.connected_clients = {}
         
         # Configuration
@@ -109,7 +110,7 @@ class ScreenServer(QObject):
             return key_name
             
     def start(self, client_ip):
-        """Démarre le serveur de partage d'écran"""
+        """Démarre le serveur (écoute commandes seulement, pas de streaming auto)"""
         self.client_ip = client_ip
         self.is_running = True
         logger.info(f"Starting ScreenServer for client {client_ip}")
@@ -118,16 +119,40 @@ class ScreenServer(QObject):
         self.command_thread = threading.Thread(target=self._command_listener, daemon=True)
         self.command_thread.start()
         
-        # Démarrer le thread vidéo
+        # NE PAS démarrer le streaming automatiquement
+        # Il sera démarré via start_streaming() sur demande
+        
+        self.status_changed.emit("Serveur démarré (prêt pour streaming)")
+        logger.info("Serveur démarré - en attente de demande de streaming")
+        
+    def start_streaming(self):
+        """Démarre le streaming vidéo (sur demande)"""
+        if self.is_streaming:
+            logger.warning("Streaming already active")
+            return
+        
+        self.is_streaming = True
         self.video_thread = threading.Thread(target=self._video_streamer, daemon=True)
         self.video_thread.start()
-        
-        self.status_changed.emit("Serveur démarré")
-        logger.info("Serveur démarré (signals emitted)")
+        self.status_changed.emit("Streaming vidéo démarré")
+        logger.info("Video streaming started on demand")
+    
+    def stop_streaming(self):
+        """Arrête le streaming vidéo"""
+        self.is_streaming = False
+        if self.video_socket:
+            try:
+                self.video_socket.close()
+                self.video_socket = None
+            except:
+                pass
+        self.status_changed.emit("Streaming vidéo arrêté")
+        logger.info("Video streaming stopped")
         
     def stop(self):
         """Arrête le serveur"""
         self.is_running = False
+        self.is_streaming = False
         logger.info("Stopping ScreenServer")
         
         if self.video_socket:
@@ -167,7 +192,7 @@ class ScreenServer(QObject):
             frame_count = 0
             last_log_time = time.time()
 
-            while self.is_running:
+            while self.is_running and self.is_streaming:
                 try:
                     # Capture frame
                     if self.use_webcam:
@@ -289,6 +314,11 @@ class ScreenServer(QObject):
                                 # Update mapping so we send video UDP to the provided port
                                 self.connected_clients[client_id] = (addr[0], video_port)
                                 logger.info(f"Registered client {client_id} -> {(addr[0], video_port)}")
+                                
+                                # Démarrer automatiquement le streaming quand un client s'enregistre
+                                if not self.is_streaming:
+                                    logger.info("Auto-starting streaming for registered client")
+                                    self.start_streaming()
                             except Exception as e:
                                 logger.exception(f"Failed to process register from {client_id}: {e}")
                         else:

@@ -359,8 +359,9 @@ class MainWindow(QMainWindow):
         
     def toggle_screen_sharing(self):
         """Active/désactive le partage d'écran local"""
-        if self.server.is_running:
-            self.server.stop()
+        if self.server.is_streaming:
+            # Arrêter le streaming
+            self.server.stop_streaming()
             self.share_screen_btn.setText("📤 Partager mon écran")
             self.share_screen_btn.setStyleSheet("""
                 QPushButton {
@@ -406,7 +407,11 @@ class MainWindow(QMainWindow):
                 if client_ip:
                     self.server.use_webcam = webcam_checkbox.isChecked()
                     self.server.add_client(client_ip)
-                    self.server.start(client_ip)
+                    # Démarrer le serveur si pas encore lancé
+                    if not self.server.is_running:
+                        self.server.start(client_ip)
+                    # Démarrer le streaming vidéo
+                    self.server.start_streaming()
                     self.share_screen_btn.setText("🛑 Arrêter le partage")
                     self.share_screen_btn.setStyleSheet("""
                         QPushButton {

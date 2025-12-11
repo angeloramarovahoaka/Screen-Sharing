@@ -76,11 +76,12 @@ def main():
     server.client_disconnected.connect(lambda c: print(f"❌ Client déconnecté: {c}"))
     server.error_occurred.connect(lambda e: print(f"⚠️ Erreur: {e}"))
     
-    # Ajouter le client et démarrer
-    server.add_client(args.client_ip)
+    # Démarrer le serveur (écoute des commandes seulement)
     server.start(args.client_ip)
     
-    print("▶️ Serveur démarré. Appuyez sur Ctrl+C pour arrêter.")
+    print("▶️ Serveur démarré (en attente de connexions).")
+    print("📝 Le streaming vidéo démarrera automatiquement quand un client se connectera.")
+    print("   Pour forcer le streaming maintenant, utilisez l'interface graphique.")
     print()
     
     try:
