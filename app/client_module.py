@@ -194,137 +194,49 @@ class ScreenClient(QObject):
         self.disconnected.emit()
         
     def _receive_video(self):
-        """Thread de réception du flux vidéo avec réassemblage des chunks"""
+        """Thread de réception du flux vidéo (simple comme client-with-cam.py)"""
         frame_count = 0
         timeout_count = 0
-        last_log_time = time.time()
         bound_addr = self.video_socket.getsockname() if self.video_socket else None
         logger.info(f"[VIDEO-RX] Starting receive thread, listening on {bound_addr}, server_ip={self.server_ip}")
         
-        # Buffer for reassembling chunked frames
-        # Format: {frame_id: {'chunks': {chunk_idx: data}, 'total': total_chunks}}
-        frame_buffer = {}
-        # Time (seconds) to wait for all chunks of a frame before giving up
-        FRAME_ASSEMBLY_TIMEOUT = 2.0
-        last_purge_time = time.time()
-        current_frame_id = -1
-        packets_received = 0
-        
         while self.is_running:
             try:
+                # Recevoir paquet UDP (base64 direct)
                 packet, addr = self.video_socket.recvfrom(BUFFER_SIZE)
-                packets_received += 1
-                timeout_count = 0  # Reset timeout counter on successful receive
+                timeout_count = 0  # Reset sur réception réussie
                 
-                # Parse chunked frame format: "FRAME:frame_id:chunk_idx:total_chunks:data"
-                if packet.startswith(b'FRAME:'):
-                    try:
-                        # Find the header end (4th colon)
-                        header_end = 0
-                        colon_count = 0
-                        for i, b in enumerate(packet):
-                            if b == ord(':'):
-                                colon_count += 1
-                                if colon_count == 4:
-                                    header_end = i + 1
-                                    break
-                        
-                        header = packet[:header_end-1].decode('utf-8')
-                        chunk_data = packet[header_end:]
-                        
-                        parts = header.split(':')
-                        frame_id = int(parts[1])
-                        chunk_idx = int(parts[2])
-                        total_chunks = int(parts[3])
-                        
-                        # Log first packet and periodically
-                        if packets_received <= 3 or packets_received % 500 == 0:
-                            logger.info(f"[VIDEO-RX] Received chunk {chunk_idx}/{total_chunks} of frame {frame_id} from {addr}, size={len(chunk_data)}")
-                        
-                        # Initialize buffer for this frame if needed
-                        now = time.time()
-                        if frame_id not in frame_buffer:
-                            # Clean old frames older than timeout
-                            old_frames = [fid for fid, meta in frame_buffer.items() if now - meta.get('first_seen', now) > FRAME_ASSEMBLY_TIMEOUT]
-                            for old_fid in old_frames:
-                                logger.debug(f"Discarding old incomplete frame {old_fid} (timeout)")
-                                del frame_buffer[old_fid]
-
-                            frame_buffer[frame_id] = {'chunks': {}, 'total': total_chunks, 'first_seen': now}
-                        
-                        # Store chunk
-                        frame_buffer[frame_id]['chunks'][chunk_idx] = chunk_data
-                        
-                        # Check if frame is complete
-                        if len(frame_buffer[frame_id]['chunks']) == total_chunks:
-                            # Reassemble frame
-                            frame_data = b''
-                            for i in range(total_chunks):
-                                frame_data += frame_buffer[frame_id]['chunks'][i]
-                            
-                            # Clean up buffer
-                            del frame_buffer[frame_id]
-                            
-                            # Decode frame
-                            try:
-                                data = base64.b64decode(frame_data)
-                                npdata = np.frombuffer(data, dtype=np.uint8)
-                                frame = cv2.imdecode(npdata, cv2.IMREAD_COLOR)
-                                
-                                if frame is not None:
-                                    frame_count += 1
-                                    self.latest_frame = frame
-                                    
-                                    # Log frame completion periodically
-                                    if frame_count <= 3 or frame_count % 30 == 0:
-                                        logger.info(f"[VIDEO-RX] Decoded complete frame #{frame_count} (frame_id={frame_id}, size={len(frame_data)})")
-                                    
-                                    # Convertir en QImage et émettre le signal
-                                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                                    h, w, ch = frame_rgb.shape
-                                    bytes_per_line = ch * w
-                                    qimg = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
-                                    self.frame_received.emit(qimg.copy())
-                                else:
-                                    logger.warning(f"[VIDEO-RX] Failed to decode frame {frame_id}")
-                            except Exception as e:
-                                logger.error(f"[VIDEO-RX] Error decoding frame {frame_id}: {e}")
+                # Décoder directement (comme client-with-cam.py)
+                try:
+                    data = base64.b64decode(packet)
+                    npdata = np.frombuffer(data, dtype=np.uint8)
+                    frame = cv2.imdecode(npdata, cv2.IMREAD_COLOR)
                     
-                    except Exception as e:
-                        logger.error(f"[VIDEO-RX] Error parsing chunk: {e}")
-                # Periodically purge frames that timed out waiting for missing chunks
-                current_time = time.time()
-                if current_time - last_purge_time > 1.0:
-                    stale = [fid for fid, meta in frame_buffer.items() if current_time - meta.get('first_seen', current_time) > FRAME_ASSEMBLY_TIMEOUT]
-                    for fid in stale:
-                        logger.debug(f"Purging stale incomplete frame {fid} after {FRAME_ASSEMBLY_TIMEOUT}s (received {len(frame_buffer[fid]['chunks'])}/{frame_buffer[fid]['total']})")
-                        del frame_buffer[fid]
-                    last_purge_time = current_time
-                else:
-                    # Legacy single-packet frame (backward compatibility)
-                    logger.debug(f"[VIDEO-RX] Received legacy packet from {addr}, size={len(packet)}")
-                    try:
-                        data = base64.b64decode(packet)
-                        npdata = np.frombuffer(data, dtype=np.uint8)
-                        frame = cv2.imdecode(npdata, cv2.IMREAD_COLOR)
+                    if frame is not None:
+                        frame_count += 1
+                        self.latest_frame = frame
                         
-                        if frame is not None:
-                            frame_count += 1
-                            self.latest_frame = frame
-                            
-                            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                            h, w, ch = frame_rgb.shape
-                            bytes_per_line = ch * w
-                            qimg = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
-                            self.frame_received.emit(qimg.copy())
-                    except Exception as e:
-                        logger.error(f"[VIDEO-RX] Error with legacy packet: {e}")
+                        # Log périodique
+                        if frame_count % 100 == 0:
+                            logger.info(f"[VIDEO-RX] Received {frame_count} frames from {addr}")
+                        
+                        # Convertir en QImage et émettre
+                        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        h, w, ch = frame_rgb.shape
+                        bytes_per_line = ch * w
+                        qimg = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
+                        self.frame_received.emit(qimg.copy())
+                    else:
+                        logger.debug(f"[VIDEO-RX] Failed to decode frame")
+                        
+                except Exception as e:
+                    logger.debug(f"[VIDEO-RX] Error decoding packet: {e}")
                     
             except socket.timeout:
                 timeout_count += 1
-                # Log a timeout only occasionally to avoid log spam (every ~5 seconds)
+                # Log timeout seulement toutes les 5 secondes
                 if timeout_count % 50 == 1:
-                    logger.warning(f"[VIDEO-RX] Timeout waiting for video (consecutive={timeout_count}), bound={bound_addr}, frames_received={frame_count}, packets={packets_received}")
+                    logger.debug(f"[VIDEO-RX] Waiting for video... (frames_received={frame_count})")
                 continue
             except Exception as e:
                 if self.is_running:
