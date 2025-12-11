@@ -7,7 +7,7 @@ BUFFER_SIZE = 65536
 CLIENT_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 CLIENT_SOCKET.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFFER_SIZE)
 HOST_NAME = socket.gethostname()
-HOST_IP =  "192.168.11.122"
+HOST_IP =  "192.168.11.107"
 print("HOST IP:", HOST_IP)
 PORT = 9999
 message = b'Hello, Server!'
