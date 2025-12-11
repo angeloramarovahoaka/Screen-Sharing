@@ -22,7 +22,7 @@ try:
 except ImportError:
     from PIL import ImageGrab
 
-from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, JPEG_QUALITY, DEFAULT_WIDTH
+from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, JPEG_QUALITY, DEFAULT_WIDTH, USE_WEBCAM
 
 # --- Logging configuration ---
 LOG_LEVEL = os.getenv("SS_LOG_LEVEL", "INFO").upper()
@@ -82,6 +82,9 @@ class ScreenServer(QObject):
         # État
         self.is_running = False
         self.connected_clients = {}
+        
+        # Configuration
+        self.use_webcam = USE_WEBCAM
         
         # Sockets
         self.video_socket = None
@@ -149,13 +152,32 @@ class ScreenServer(QObject):
             self.status_changed.emit("Streaming vidéo démarré")
             logger.info("Video streamer thread started")
             
+            if self.use_webcam:
+                # Utiliser la webcam
+                vid = cv2.VideoCapture(0)
+                if not vid.isOpened():
+                    self.error_occurred.emit("Impossible d'ouvrir la webcam")
+                    logger.error("Failed to open webcam")
+                    return
+                logger.info("Using webcam for video streaming")
+            else:
+                vid = None
+                logger.info("Using screen capture for video streaming")
+            
             while self.is_running:
                 try:
-                    # Capture d'écran
-                    img_pil = ImageGrab.grab()
-                    frame = np.array(img_pil, dtype=np.uint8)
-                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                    frame = imutils.resize(frame, width=DEFAULT_WIDTH)
+                    if self.use_webcam:
+                        # Capture webcam
+                        _, frame = vid.read()
+                        if frame is None:
+                            continue
+                        frame = imutils.resize(frame, width=DEFAULT_WIDTH)
+                    else:
+                        # Capture d'écran
+                        img_pil = ImageGrab.grab()
+                        frame = np.array(img_pil, dtype=np.uint8)
+                        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                        frame = imutils.resize(frame, width=DEFAULT_WIDTH)
                     
                     # Encodage JPEG
                     encoded, buffer = cv2.imencode(
@@ -180,6 +202,8 @@ class ScreenServer(QObject):
             self.error_occurred.emit(f"Erreur vidéo: {e}")
             logger.exception(f"Video streamer fatal error: {e}")
         finally:
+            if self.use_webcam and 'vid' in locals():
+                vid.release()
             if self.video_socket:
                 self.video_socket.close()
                 

@@ -40,6 +40,11 @@ def main():
         default=None,
         help="Optional log collector in format host:port to forward logs"
     )
+    parser.add_argument(
+        "--webcam",
+        action="store_true",
+        help="Utiliser la webcam au lieu de la capture d'écran"
+    )
     
     args = parser.parse_args()
     
@@ -57,6 +62,7 @@ def main():
     server = ScreenServer()
     server.screen_width = args.width
     server.screen_height = args.height
+    server.use_webcam = args.webcam
 
     # If a log collector was provided, export env var so modules forward logs
     if args.log_collector:

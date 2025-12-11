@@ -17,6 +17,9 @@ DEFAULT_HEIGHT = 360
 # Qualité JPEG réduite pour des paquets plus petits
 JPEG_QUALITY = 50  # Lower quality = smaller packets, better cross-network performance
 
+# Utiliser la webcam au lieu de la capture d'écran
+USE_WEBCAM = True
+
 # --- CONFIGURATION AUDIO ---
 AUDIO_RATE = 44100
 AUDIO_CHANNELS = 1

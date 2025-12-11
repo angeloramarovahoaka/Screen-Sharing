@@ -4,7 +4,7 @@ Fenêtre principale de l'application
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
     QPushButton, QLabel, QFrame, QSplitter, QMessageBox, QDialog,
-    QLineEdit, QFormLayout, QToolBar, QStatusBar, QApplication
+    QLineEdit, QFormLayout, QToolBar, QStatusBar, QApplication, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont, QAction, QIcon
@@ -388,6 +388,9 @@ class MainWindow(QMainWindow):
             ip_input.setPlaceholderText("192.168.1.100")
             layout.addWidget(ip_input)
             
+            webcam_checkbox = QCheckBox("Utiliser la webcam au lieu de l'écran")
+            layout.addWidget(webcam_checkbox)
+            
             btn_layout = QHBoxLayout()
             cancel_btn = QPushButton("Annuler")
             cancel_btn.clicked.connect(dialog.reject)
@@ -401,6 +404,7 @@ class MainWindow(QMainWindow):
             if dialog.exec() == QDialog.Accepted:
                 client_ip = ip_input.text().strip()
                 if client_ip:
+                    self.server.use_webcam = webcam_checkbox.isChecked()
                     self.server.add_client(client_ip)
                     self.server.start(client_ip)
                     self.share_screen_btn.setText("🛑 Arrêter le partage")
