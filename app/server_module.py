@@ -164,39 +164,84 @@ class ScreenServer(QObject):
                 vid = None
                 logger.info("Using screen capture for video streaming")
             
+            # Parameters for fragmentation
+            CHUNK_SIZE = 1400
+            frame_id = 0
+            fps = 12
+            frame_interval = 1.0 / fps
+            last_log_time = time.time()
+            frames_sent = 0
+
             while self.is_running:
+                loop_start = time.time()
                 try:
+                    # Capture
+                    capture_start = time.time()
                     if self.use_webcam:
-                        # Capture webcam
-                        _, frame = vid.read()
-                        if frame is None:
+                        ret, frame = vid.read()
+                        if not ret or frame is None:
+                            logger.debug("Webcam read returned no frame; retrying")
+                            time.sleep(0.01)
                             continue
                         frame = imutils.resize(frame, width=DEFAULT_WIDTH)
                     else:
-                        # Capture d'écran
                         img_pil = ImageGrab.grab()
                         frame = np.array(img_pil, dtype=np.uint8)
                         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                         frame = imutils.resize(frame, width=DEFAULT_WIDTH)
-                    
-                    # Encodage JPEG
-                    encoded, buffer = cv2.imencode(
-                        '.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY]
-                    )
-                    b64encoded = base64.b64encode(buffer)
-                    
-                    # Envoi à tous les clients connectés
+                    capture_time = (time.time() - capture_start)
+
+                    # Encode JPEG
+                    encode_start = time.time()
+                    success, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+                    if not success:
+                        logger.error("JPEG encoding failed for captured frame")
+                        time.sleep(0.01)
+                        continue
+                    b64encoded = base64.b64encode(buf)
+                    encode_time = (time.time() - encode_start)
+
+                    total_len = len(b64encoded)
+                    # Fragment into chunks
+                    total_chunks = (total_len + CHUNK_SIZE - 1) // CHUNK_SIZE
+
+                    logger.debug(f"Frame {frame_id} encoded size={total_len} bytes, chunks={total_chunks}, capture_time={capture_time:.03f}s encode_time={encode_time:.03f}s")
+
+                    # Send to each client
                     for client_id, client_addr in list(self.connected_clients.items()):
                         try:
-                            sent = self.video_socket.sendto(b64encoded, client_addr)
-                            logger.debug(f"Sent video packet to {client_addr} ({len(b64encoded)} bytes) -> sendto returned {sent}")
+                            sent_chunks = 0
+                            for idx in range(total_chunks):
+                                start = idx * CHUNK_SIZE
+                                end = start + CHUNK_SIZE
+                                chunk = b64encoded[start:end]
+                                header = f"FRAME:{frame_id}:{idx}:{total_chunks}:".encode('utf-8')
+                                packet = header + chunk
+                                try:
+                                    self.video_socket.sendto(packet, client_addr)
+                                    sent_chunks += 1
+                                except Exception as e:
+                                    logger.debug(f"sendto failed to {client_addr} for frame {frame_id} chunk {idx}: {e}")
+                                    # don't break; try to send remaining chunks
+                            logger.info(f"Sent frame {frame_id} -> {client_addr} ({sent_chunks}/{total_chunks} chunks)")
                         except Exception as e:
-                            logger.exception(f"Erreur en envoyant vers {client_addr}: {e}")
-                            # Ne pas supprimer le client automatiquement; laisser la logique de socket gérer
-                            
+                            logger.exception(f"Erreur en envoyant le frame {frame_id} vers {client_addr}: {e}")
+
+                    frames_sent += 1
+                    frame_id = (frame_id + 1) % 1000000
+
                 except Exception as e:
-                    logger.debug(f"Erreur dans video_streamer loop: {e}")
-                    time.sleep(0.01)
+                    logger.exception(f"Erreur dans video_streamer loop: {e}")
+
+                # Maintain target FPS
+                elapsed = time.time() - loop_start
+                to_sleep = max(0.0, frame_interval - elapsed)
+                if to_sleep > 0:
+                    time.sleep(to_sleep)
+                # periodic stats
+                if time.time() - last_log_time > 10:
+                    logger.info(f"Video streamer stats: frames_sent={frames_sent}, clients={len(self.connected_clients)}")
+                    last_log_time = time.time()
                     
         except Exception as e:
             self.error_occurred.emit(f"Erreur vidéo: {e}")
