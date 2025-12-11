@@ -468,8 +468,6 @@ class ScreenServer(QObject):
             else:
                 key_names = [command['key']]
             for key_name in key_names:
-                logger.debug(f"Processing key command: action={action}, key_name={key_name}")
-                
                 # Gestion spéciale des touches directionnelles sur Windows
                 arrow_keys = ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down']
                 if key_name in arrow_keys:
@@ -492,10 +490,8 @@ class ScreenServer(QObject):
                     if pynput_key:
                         try:
                             if action == 'press':
-                                logger.debug(f"Pressing key: {key_name} -> {pynput_key}")
                                 self.keyboard.press(pynput_key)
                             elif action == 'release':
-                                logger.debug(f"Releasing key: {key_name} -> {pynput_key}")
                                 self.keyboard.release(pynput_key)
                         except Exception as e:
                             logger.error(f"Failed to execute key action {action} for {key_name}: {e}")

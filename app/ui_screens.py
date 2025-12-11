@@ -1,8 +1,6 @@
 """
 Widgets pour l'affichage et la manipulation des écrans partagés
 """
-import logging
-
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
     QFrame, QSizePolicy, QMenu, QToolButton, QSlider, QGridLayout
@@ -467,7 +465,6 @@ class ScreenViewer(QWidget):
             # Envoyer la touche principale
             key_name = self._get_key_name(event)
             if key_name:
-                logger.debug(f"Sending key press: {key_name}")
                 self.client.send_command({
                     'type': 'key',
                     'action': 'press',
@@ -484,7 +481,6 @@ class ScreenViewer(QWidget):
             # Envoyer le relâchement de la touche principale
             key_name = self._get_key_name(event)
             if key_name:
-                logger.debug(f"Sending key release: {key_name}")
                 self.client.send_command({
                     'type': 'key',
                     'action': 'release',
