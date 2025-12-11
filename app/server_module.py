@@ -129,9 +129,9 @@ class ScreenServer(QObject):
             'alt': Key.alt,
             'alt_l': Key.alt_l,
             'alt_r': Key.alt_r,
-            'cmd': Key.cmd,  # Touche Windows/Command
-            'cmd_l': Key.cmd,
-            'cmd_r': Key.cmd_r,
+            'cmd': Key.cmd,  # Touche Windows/Command (fonctionne sur Windows, Linux, Mac)
+            'cmd_l': Key.cmd,  # Windows gauche
+            'cmd_r': Key.cmd_r,  # Windows droit
             'caps_lock': Key.caps_lock,
             'insert': Key.insert,
             'pause': Key.pause,
@@ -419,10 +419,17 @@ class ScreenServer(QObject):
             pynput_key = self.get_pynput_key(key_name)
             
             if pynput_key:
-                if action == 'press':
-                    self.keyboard.press(pynput_key)
-                elif action == 'release':
-                    self.keyboard.release(pynput_key)
+                try:
+                    if action == 'press':
+                        logger.debug(f"Pressing key: {key_name} -> {pynput_key}")
+                        self.keyboard.press(pynput_key)
+                    elif action == 'release':
+                        logger.debug(f"Releasing key: {key_name} -> {pynput_key}")
+                        self.keyboard.release(pynput_key)
+                except Exception as e:
+                    logger.error(f"Failed to execute key action {action} for {key_name}: {e}")
+            else:
+                logger.warning(f"Could not map key_name '{key_name}' to pynput key")
                     
     def add_client(self, client_ip):
         """Ajoute un client pour recevoir le flux vidéo"""
