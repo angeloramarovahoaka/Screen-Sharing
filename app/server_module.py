@@ -120,18 +120,18 @@ class ScreenServer(QObject):
             'down': Key.down,
             'page_up': Key.page_up,
             'page_down': Key.page_down,
-            'shift': Key.shift,
+            'shift': Key.shift_l,
             'shift_l': Key.shift_l,
             'shift_r': Key.shift_r,
-            'ctrl': Key.ctrl,
+            'ctrl': Key.ctrl_l,
             'ctrl_l': Key.ctrl_l,
             'ctrl_r': Key.ctrl_r,
-            'alt': Key.alt,
+            'alt': Key.alt_l,
             'alt_l': Key.alt_l,
             'alt_r': Key.alt_r,
-            'cmd': Key.cmd,  # Touche Windows/Command (fonctionne sur Windows, Linux, Mac)
-            'cmd_l': Key.cmd,  # Windows gauche
-            'cmd_r': Key.cmd_r,  # Windows droit
+            'cmd': Key.super_l,  # Touche Windows/Command (fonctionne sur Windows, Linux, Mac)
+            'cmd_l': Key.super_l,  # Windows gauche
+            'cmd_r': Key.super_r,  # Windows droit
             'caps_lock': Key.caps_lock,
             'insert': Key.insert,
             'pause': Key.pause,
@@ -415,21 +415,25 @@ class ScreenServer(QObject):
                         
         elif cmd_type == 'key':
             action = command['action']
-            key_name = command['key']
-            pynput_key = self.get_pynput_key(key_name)
-            
-            if pynput_key:
-                try:
-                    if action == 'press':
-                        logger.debug(f"Pressing key: {key_name} -> {pynput_key}")
-                        self.keyboard.press(pynput_key)
-                    elif action == 'release':
-                        logger.debug(f"Releasing key: {key_name} -> {pynput_key}")
-                        self.keyboard.release(pynput_key)
-                except Exception as e:
-                    logger.error(f"Failed to execute key action {action} for {key_name}: {e}")
+            if 'keys' in command:
+                key_names = command['keys']
             else:
-                logger.warning(f"Could not map key_name '{key_name}' to pynput key")
+                key_names = [command['key']]
+            for key_name in key_names:
+                pynput_key = self.get_pynput_key(key_name)
+                
+                if pynput_key:
+                    try:
+                        if action == 'press':
+                            logger.debug(f"Pressing key: {key_name} -> {pynput_key}")
+                            self.keyboard.press(pynput_key)
+                        elif action == 'release':
+                            logger.debug(f"Releasing key: {key_name} -> {pynput_key}")
+                            self.keyboard.release(pynput_key)
+                    except Exception as e:
+                        logger.error(f"Failed to execute key action {action} for {key_name}: {e}")
+                else:
+                    logger.warning(f"Could not map key_name '{key_name}' to pynput key")
                     
     def add_client(self, client_ip):
         """Ajoute un client pour recevoir le flux vidéo"""
