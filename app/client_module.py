@@ -204,6 +204,9 @@ class ScreenClient(QObject):
         # Buffer for reassembling chunked frames
         # Format: {frame_id: {'chunks': {chunk_idx: data}, 'total': total_chunks}}
         frame_buffer = {}
+        # Time (seconds) to wait for all chunks of a frame before giving up
+        FRAME_ASSEMBLY_TIMEOUT = 2.0
+        last_purge_time = time.time()
         current_frame_id = -1
         packets_received = 0
         
@@ -239,13 +242,15 @@ class ScreenClient(QObject):
                             logger.info(f"[VIDEO-RX] Received chunk {chunk_idx}/{total_chunks} of frame {frame_id} from {addr}, size={len(chunk_data)}")
                         
                         # Initialize buffer for this frame if needed
+                        now = time.time()
                         if frame_id not in frame_buffer:
-                            # Clean old frames (keep only last 2)
-                            old_frames = [fid for fid in frame_buffer if fid < frame_id - 1]
+                            # Clean old frames older than timeout
+                            old_frames = [fid for fid, meta in frame_buffer.items() if now - meta.get('first_seen', now) > FRAME_ASSEMBLY_TIMEOUT]
                             for old_fid in old_frames:
+                                logger.debug(f"Discarding old incomplete frame {old_fid} (timeout)")
                                 del frame_buffer[old_fid]
-                            
-                            frame_buffer[frame_id] = {'chunks': {}, 'total': total_chunks}
+
+                            frame_buffer[frame_id] = {'chunks': {}, 'total': total_chunks, 'first_seen': now}
                         
                         # Store chunk
                         frame_buffer[frame_id]['chunks'][chunk_idx] = chunk_data
@@ -287,6 +292,14 @@ class ScreenClient(QObject):
                     
                     except Exception as e:
                         logger.error(f"[VIDEO-RX] Error parsing chunk: {e}")
+                # Periodically purge frames that timed out waiting for missing chunks
+                current_time = time.time()
+                if current_time - last_purge_time > 1.0:
+                    stale = [fid for fid, meta in frame_buffer.items() if current_time - meta.get('first_seen', current_time) > FRAME_ASSEMBLY_TIMEOUT]
+                    for fid in stale:
+                        logger.debug(f"Purging stale incomplete frame {fid} after {FRAME_ASSEMBLY_TIMEOUT}s (received {len(frame_buffer[fid]['chunks'])}/{frame_buffer[fid]['total']})")
+                        del frame_buffer[fid]
+                    last_purge_time = current_time
                 else:
                     # Legacy single-packet frame (backward compatibility)
                     logger.debug(f"[VIDEO-RX] Received legacy packet from {addr}, size={len(packet)}")
@@ -309,7 +322,7 @@ class ScreenClient(QObject):
                     
             except socket.timeout:
                 timeout_count += 1
-                # Log timeout warnings periodically (every 50 timeouts = ~5 seconds with 0.1s timeout)
+                # Log a timeout only occasionally to avoid log spam (every ~5 seconds)
                 if timeout_count % 50 == 1:
                     logger.warning(f"[VIDEO-RX] Timeout waiting for video (consecutive={timeout_count}), bound={bound_addr}, frames_received={frame_count}, packets={packets_received}")
                 continue
