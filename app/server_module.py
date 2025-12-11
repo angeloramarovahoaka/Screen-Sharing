@@ -10,12 +10,18 @@ import time
 import base64
 import threading
 import json
+import platform
 from PySide6.QtCore import QObject, Signal, QThread
 from pynput.mouse import Controller as MouseController, Button
 from pynput.keyboard import Controller as KeyboardController, Key
 import logging
 import os
 from logging.handlers import RotatingFileHandler, DatagramHandler
+
+# Import pour la gestion des touches spéciales sur Windows
+if platform.system() == 'Windows':
+    import ctypes
+    from ctypes import wintypes
 
 try:
     import pyscreenshot as ImageGrab
@@ -102,6 +108,44 @@ class ScreenServer(QObject):
             "middle": Button.middle
         }
         
+        # Constants pour les touches directionnelles sur Windows
+        if platform.system() == 'Windows':
+            self.VK_LEFT = 0x25
+            self.VK_UP = 0x26
+            self.VK_RIGHT = 0x27
+            self.VK_DOWN = 0x28
+            self.KEYEVENTF_KEYUP = 0x0002
+    
+    def _press_arrow_key(self, direction):
+        """Appuie sur une touche directionnelle en utilisant l'API Windows native"""
+        if platform.system() == 'Windows':
+            vk_codes = {
+                'arrow_left': self.VK_LEFT,
+                'arrow_up': self.VK_UP,
+                'arrow_right': self.VK_RIGHT,
+                'arrow_down': self.VK_DOWN
+            }
+            if direction in vk_codes:
+                ctypes.windll.user32.keybd_event(vk_codes[direction], 0, 0, 0)
+                logger.debug(f"Pressed arrow key {direction} via Win32 API")
+                return True
+        return False
+    
+    def _release_arrow_key(self, direction):
+        """Relâche une touche directionnelle en utilisant l'API Windows native"""
+        if platform.system() == 'Windows':
+            vk_codes = {
+                'arrow_left': self.VK_LEFT,
+                'arrow_up': self.VK_UP,
+                'arrow_right': self.VK_RIGHT,
+                'arrow_down': self.VK_DOWN
+            }
+            if direction in vk_codes:
+                ctypes.windll.user32.keybd_event(vk_codes[direction], 0, self.KEYEVENTF_KEYUP, 0)
+                logger.debug(f"Released arrow key {direction} via Win32 API")
+                return True
+        return False
+        
     def get_pynput_key(self, key_name):
         """Convertit une chaîne en objet pynput Key ou caractère."""
         # Mapping explicite pour les touches spéciales
@@ -118,6 +162,10 @@ class ScreenServer(QObject):
             'right': Key.right,
             'up': Key.up,
             'down': Key.down,
+            'arrow_left': Key.left,
+            'arrow_right': Key.right,
+            'arrow_up': Key.up,
+            'arrow_down': Key.down,
             'page_up': Key.page_up,
             'page_down': Key.page_down,
             'shift': Key.shift_l,
@@ -129,9 +177,9 @@ class ScreenServer(QObject):
             'alt': Key.alt_l,
             'alt_l': Key.alt_l,
             'alt_r': Key.alt_r,
-            'cmd': Key.super_l,  # Touche Windows/Command (fonctionne sur Windows, Linux, Mac)
-            'cmd_l': Key.super_l,  # Windows gauche
-            'cmd_r': Key.super_r,  # Windows droit
+            'cmd': Key.cmd,
+            'cmd_l': Key.cmd,
+            'cmd_r': Key.cmd_r,
             'caps_lock': Key.caps_lock,
             'insert': Key.insert,
             'pause': Key.pause,
@@ -420,20 +468,39 @@ class ScreenServer(QObject):
             else:
                 key_names = [command['key']]
             for key_name in key_names:
-                pynput_key = self.get_pynput_key(key_name)
+                logger.debug(f"Processing key command: action={action}, key_name={key_name}")
                 
-                if pynput_key:
-                    try:
-                        if action == 'press':
-                            logger.debug(f"Pressing key: {key_name} -> {pynput_key}")
-                            self.keyboard.press(pynput_key)
-                        elif action == 'release':
-                            logger.debug(f"Releasing key: {key_name} -> {pynput_key}")
-                            self.keyboard.release(pynput_key)
-                    except Exception as e:
-                        logger.error(f"Failed to execute key action {action} for {key_name}: {e}")
+                # Gestion spéciale des touches directionnelles sur Windows
+                arrow_keys = ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down']
+                if key_name in arrow_keys:
+                    if action == 'press':
+                        if not self._press_arrow_key(key_name):
+                            # Fallback à pynput si ctypes échoue
+                            pynput_key = self.get_pynput_key(key_name)
+                            if pynput_key:
+                                self.keyboard.press(pynput_key)
+                    elif action == 'release':
+                        if not self._release_arrow_key(key_name):
+                            # Fallback à pynput si ctypes échoue
+                            pynput_key = self.get_pynput_key(key_name)
+                            if pynput_key:
+                                self.keyboard.release(pynput_key)
                 else:
-                    logger.warning(f"Could not map key_name '{key_name}' to pynput key")
+                    # Touches normales via pynput
+                    pynput_key = self.get_pynput_key(key_name)
+                    
+                    if pynput_key:
+                        try:
+                            if action == 'press':
+                                logger.debug(f"Pressing key: {key_name} -> {pynput_key}")
+                                self.keyboard.press(pynput_key)
+                            elif action == 'release':
+                                logger.debug(f"Releasing key: {key_name} -> {pynput_key}")
+                                self.keyboard.release(pynput_key)
+                        except Exception as e:
+                            logger.error(f"Failed to execute key action {action} for {key_name}: {e}")
+                    else:
+                        logger.warning(f"Could not map key_name '{key_name}' to pynput key")
                     
     def add_client(self, client_ip):
         """Ajoute un client pour recevoir le flux vidéo"""
