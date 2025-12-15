@@ -13,7 +13,7 @@ from PySide6.QtCore import QObject, Signal, QThread, QTimer
 from PySide6.QtGui import QImage, QPixmap
 from pynput import keyboard, mouse
 
-from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, DEFAULT_WIDTH, DEFAULT_HEIGHT, SERVER_IP, app_state
+from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, DEFAULT_WIDTH, DEFAULT_HEIGHT, SERVER_IP, app_state, USE_WEBCAM, JPEG_QUALITY
 import logging
 import os
 from logging.handlers import RotatingFileHandler, DatagramHandler
@@ -81,6 +81,12 @@ class ScreenClient(QObject):
         
         # Thread de réception
         self.receive_thread = None
+        # Thread to listen for server commands
+        self.command_listen_thread = None
+        # If this client will stream its screen to a monitor (admin), track streaming state
+        self.is_streaming_out = False
+        self.streaming_thread = None
+        self.streaming_target = None  # tuple (ip, port)
         
         # Listeners clavier/souris (optionnels, pour capture globale)
         self.keyboard_listener = None
@@ -154,6 +160,12 @@ class ScreenClient(QObject):
                 logger.debug(f"Sent START to {(server_ip, VIDEO_PORT)}")
             except Exception:
                 logger.debug("Failed to send START (non-fatal)")
+            # Start a thread to listen for commands from the server
+            try:
+                self.command_listen_thread = threading.Thread(target=self._listen_server_commands, daemon=True)
+                self.command_listen_thread.start()
+            except Exception:
+                logger.exception("Failed to start command listener thread")
         
             self.status_changed.emit(f"Connecté à {server_ip}")
             self.connected.emit()
@@ -326,6 +338,197 @@ class ScreenClient(QObject):
         """Définit la taille d'affichage"""
         self.display_width = width
         self.display_height = height
+
+    # ---- New: listen for server commands and optional streaming out ----
+    def _listen_server_commands(self):
+        """Listen for JSON commands from the server on the TCP command socket."""
+        logger.info("Starting server command listener thread")
+        try:
+            conn = self.command_socket
+            buf = b''
+            while self.is_running and conn:
+                try:
+                    data = conn.recv(4096)
+                    if not data:
+                        break
+                    buf += data
+                    while b'\n' in buf:
+                        line, buf = buf.split(b'\n', 1)
+                        try:
+                            cmd = json.loads(line.decode('utf-8'))
+                        except Exception:
+                            logger.warning("Invalid command JSON from server")
+                            continue
+                        self._process_server_command(cmd)
+                except socket.timeout:
+                    continue
+                except Exception as e:
+                    logger.exception(f"Error in server command listener: {e}")
+                    break
+        finally:
+            logger.info("Server command listener thread exiting")
+
+    def _process_server_command(self, cmd):
+        """Process a command sent by the server/admin."""
+        try:
+            t = cmd.get('type')
+            if t == 'control' and cmd.get('action') == 'start_stream':
+                ip = cmd.get('monitor_ip')
+                port = int(cmd.get('monitor_port', VIDEO_PORT))
+                self._start_streaming_to((ip, port))
+            elif t == 'control' and cmd.get('action') == 'stop_stream':
+                self._stop_streaming()
+            else:
+                logger.debug(f"Received server command: {cmd}")
+        except Exception as e:
+            logger.exception(f"Failed to process server command: {e}")
+
+        # Handle input/control commands coming from admin
+        try:
+            if cmd.get('type') == 'mouse':
+                action = cmd.get('action')
+                if action != 'scroll':
+                    x = int(cmd.get('x', 0) * self.display_width)
+                    y = int(cmd.get('y', 0) * self.display_height)
+                    try:
+                        mouse.Controller().position = (x, y)
+                    except Exception:
+                        pass
+
+                if action == 'move':
+                    pass
+                elif action == 'scroll':
+                    try:
+                        m = mouse.Controller()
+                        m.scroll(int(cmd.get('dx', 0)), int(cmd.get('dy', 0)))
+                    except Exception:
+                        pass
+                else:
+                    btn = cmd.get('button')
+                    btn_map = {'left': mouse.Button.left, 'right': mouse.Button.right, 'middle': mouse.Button.middle}
+                    b = btn_map.get(btn)
+                    if b:
+                        m = mouse.Controller()
+                        if action == 'press':
+                            m.press(b)
+                        elif action == 'release':
+                            m.release(b)
+
+            elif cmd.get('type') == 'key':
+                action = cmd.get('action')
+                key_name = cmd.get('key')
+                # Map to pynput key where appropriate
+                pk = None
+                try:
+                    from pynput.keyboard import Key as PKey
+                    special = {
+                        'enter': PKey.enter,
+                        'backspace': PKey.backspace,
+                        'tab': PKey.tab,
+                        'esc': PKey.esc,
+                        'space': PKey.space,
+                        'left': PKey.left,
+                        'right': PKey.right,
+                        'up': PKey.up,
+                        'down': PKey.down,
+                    }
+                    pk = special.get(key_name, None)
+                except Exception:
+                    pk = None
+
+                kctrl = keyboard.Controller()
+                try:
+                    if action == 'press':
+                        if pk:
+                            kctrl.press(pk)
+                        else:
+                            kctrl.press(key_name)
+                    elif action == 'release':
+                        if pk:
+                            kctrl.release(pk)
+                        else:
+                            kctrl.release(key_name)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _start_streaming_to(self, target):
+        """Start sending captured frames via UDP to target (ip, port)."""
+        if not target or not target[0]:
+            logger.warning("Invalid streaming target")
+            return
+        if self.is_streaming_out:
+            logger.info("Already streaming out; restarting target")
+            self.streaming_target = target
+            return
+        self.is_streaming_out = True
+        self.streaming_target = target
+
+        def _stream_loop():
+            logger.info(f"Starting outbound stream to {target}")
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                use_webcam = USE_WEBCAM
+                if use_webcam:
+                    cap = cv2.VideoCapture(0)
+                    if not cap.isOpened():
+                        logger.error("Webcam open failed for outbound streaming")
+                        return
+                else:
+                    cap = None
+
+                while self.is_streaming_out:
+                    try:
+                        if cap is not None:
+                            ret, frame = cap.read()
+                            if not ret:
+                                time.sleep(0.01)
+                                continue
+                        else:
+                            try:
+                                from PIL import ImageGrab as PILGrab
+                                img = PILGrab.grab()
+                                frame = np.array(img, dtype=np.uint8)
+                                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                            except Exception:
+                                time.sleep(0.05)
+                                continue
+
+                        encoded, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+                        b64encoded = base64.b64encode(buffer)
+                        try:
+                            sock.sendto(b64encoded, target)
+                        except Exception as e:
+                            logger.debug(f"UDP send error to {target}: {e}")
+                        time.sleep(0.02)
+            except Exception as e:
+                logger.exception(f"Outbound streaming error: {e}")
+            finally:
+                try:
+                    if cap is not None:
+                        cap.release()
+                except:
+                    pass
+                try:
+                    sock.close()
+                except:
+                    pass
+                logger.info("Outbound stream loop ended")
+
+        self.streaming_thread = threading.Thread(target=_stream_loop, daemon=True)
+        self.streaming_thread.start()
+
+    def _stop_streaming(self):
+        if not self.is_streaming_out:
+            return
+        self.is_streaming_out = False
+        self.streaming_target = None
+        try:
+            if self.streaming_thread:
+                self.streaming_thread.join(timeout=0.5)
+        except Exception:
+            pass
 
 
 class MultiScreenClient(QObject):

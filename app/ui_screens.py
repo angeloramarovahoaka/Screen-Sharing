@@ -74,6 +74,7 @@ class ScreenThumbnail(QFrame):
     clicked = Signal(str)  # screen_id
     double_clicked = Signal(str)  # screen_id pour zoom
     remove_requested = Signal(str)  # screen_id
+    monitor_requested = Signal(str)  # screen_id
     
     def __init__(self, screen_id, screen_name, parent=None):
         super().__init__(parent)
@@ -139,6 +140,7 @@ class ScreenThumbnail(QFrame):
         
         menu = QMenu(self.menu_button)
         menu.addAction("🔍 Zoom", lambda: self.double_clicked.emit(self.screen_id))
+        menu.addAction("👀 Surveiller", lambda: self.monitor_requested.emit(self.screen_id))
         menu.addAction("❌ Déconnecter", lambda: self.remove_requested.emit(self.screen_id))
         self.menu_button.setMenu(menu)
         info_layout.addWidget(self.menu_button)
@@ -634,6 +636,7 @@ class ScreenListWidget(QWidget):
     screen_selected = Signal(str)
     screen_zoom_requested = Signal(str)
     screen_remove_requested = Signal(str)
+    screen_monitor_requested = Signal(str)
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -685,6 +688,7 @@ class ScreenListWidget(QWidget):
         thumbnail.clicked.connect(self._on_thumbnail_clicked)
         thumbnail.double_clicked.connect(self.screen_zoom_requested.emit)
         thumbnail.remove_requested.connect(self.screen_remove_requested.emit)
+        thumbnail.monitor_requested.connect(self.screen_monitor_requested.emit)
         
         self.thumbnails[screen_id] = thumbnail
         self._update_grid()

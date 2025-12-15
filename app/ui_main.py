@@ -8,8 +8,14 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont, QAction, QIcon
+import socket
+import base64
+import threading
+import cv2
+import numpy as np
+from PySide6.QtGui import QImage
 
-from .config import app_state
+from .config import app_state, BUFFER_SIZE
 from .client_module import ScreenClient, MultiScreenClient
 from .server_module import ScreenServer
 from .ui_login import LoginWindow, UserInfoWidget
@@ -230,6 +236,7 @@ class MainWindow(QMainWindow):
         self.screen_list.screen_selected.connect(self._on_screen_selected)
         self.screen_list.screen_zoom_requested.connect(self.zoom_screen)
         self.screen_list.screen_remove_requested.connect(self.remove_screen)
+        self.screen_list.screen_monitor_requested.connect(self._monitor_client)
         
         # Multi-client
         self.multi_client.screen_updated.connect(self._on_screen_frame_updated)
@@ -265,17 +272,8 @@ class MainWindow(QMainWindow):
             # CLIENT: hide controls that require manual IPs and auto-connect to configured server
             self.add_screen_btn.setVisible(False)
             self.share_screen_btn.setEnabled(False)
-            # Auto-connect as a viewer to the configured server IP
-            client = ScreenClient()
-            screen_id = f"server_{SERVER_IP}"
-            if client.connect_to_server(None):
-                self.multi_client.clients[screen_id] = client
-                client.frame_received.connect(
-                    lambda img, sid=screen_id: self._on_screen_frame_updated(sid, img)
-                )
-                self.screen_list.add_screen(screen_id, f"Serveur ({SERVER_IP})")
-                self.toast.show_toast(f"Connecté automatiquement à {SERVER_IP}", kind="success")
-                self._refresh_app_status()
+            # CLIENT: auto-connect logic is handled in client module; UI shows connection status only
+            self.toast.show_toast(f"Client connecté au serveur {SERVER_IP}", kind="info")
         
     def handle_logout(self):
         """Gère la déconnexion"""
@@ -500,6 +498,77 @@ class MainWindow(QMainWindow):
         # Ensure the UI shows the client
         if client_id not in self.screen_list.thumbnails:
             self.screen_list.add_screen(client_id, name)
+
+    def _monitor_client(self, client_id):
+        """Request a connected client to start streaming its screen to this admin and show it."""
+        # Must be admin
+        if app_state.current_user != 'admin':
+            self.toast.show_toast("Action réservée à l'admin", kind="error")
+            return
+
+        info = self.server.connected_clients.get(client_id)
+        if not info:
+            self.toast.show_toast("Client introuvable", kind="error")
+            return
+
+        conn = info.get('conn')
+        if not conn:
+            self.toast.show_toast("Pas de canal de commande pour ce client", kind="error")
+            return
+
+        # Prepare a UDP receiver for the incoming stream
+        from .client_module import QThread, QObject, Signal
+        # Create a simple UDP receiver object using ScreenClient-like behavior
+        receiver = None
+        try:
+            # Bind ephemeral UDP port to receive frames
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.bind(('0.0.0.0', 0))
+            monitor_port = sock.getsockname()[1]
+            monitor_ip = conn.getsockname()[0]
+        except Exception as e:
+            self.toast.show_toast(f"Echec création socket: {e}", kind="error")
+            return
+
+        # Create a background thread to read frames from sock
+        def recv_loop():
+            buf = b''
+            while True:
+                try:
+                    packet, addr = sock.recvfrom(BUFFER_SIZE)
+                except Exception:
+                    break
+                try:
+                    data = base64.b64decode(packet)
+                    npdata = np.frombuffer(data, dtype=np.uint8)
+                    frame = cv2.imdecode(npdata, cv2.IMREAD_COLOR)
+                    if frame is not None:
+                        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        h, w, ch = frame_rgb.shape
+                        bytes_per_line = ch * w
+                        qimg = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
+                        # Emit via main thread by using Qt timer singleShot
+                        QTimer.singleShot(0, lambda img=qimg.copy(), sid=client_id: self._on_screen_frame_updated(sid, img))
+                except Exception:
+                    continue
+
+        t = threading.Thread(target=recv_loop, daemon=True)
+        t.start()
+
+        # Ask client to start streaming to monitor_ip:monitor_port
+        cmd = {'type': 'control', 'action': 'start_stream', 'monitor_ip': monitor_ip, 'monitor_port': monitor_port}
+        ok = self.server.send_command_to_client(client_id, cmd)
+        if ok:
+            # Ensure thumbnail exists
+            name = info.get('username') or info.get('ip')
+            if client_id not in self.multi_client.clients:
+                # store a placeholder object so status known
+                self.multi_client.clients[client_id] = None
+            if client_id not in self.screen_list.thumbnails:
+                self.screen_list.add_screen(client_id, name)
+            self.toast.show_toast(f"Demande de surveillance envoyée à {name}", kind="info")
+        else:
+            self.toast.show_toast("Echec envoi commande au client", kind="error")
 
     def _on_server_client_disconnected(self, client_id):
         """Remove client from UI when it disconnects."""

@@ -359,7 +359,8 @@ class ScreenServer(QObject):
                     conn, addr = self.command_socket.accept()
                     client_id = f"{addr[0]}:{addr[1]}"
                     # Store client info as dict so we can keep username + port
-                    self.connected_clients[client_id] = {'ip': addr[0], 'port': VIDEO_PORT, 'username': None}
+                    # Store connection socket so server can send commands back to client
+                    self.connected_clients[client_id] = {'ip': addr[0], 'port': VIDEO_PORT, 'username': None, 'conn': conn}
                     self.client_connected.emit(client_id)
                     logger.info(f"Accepted command connection from {addr}; registered client_id={client_id}")
                     
@@ -384,6 +385,24 @@ class ScreenServer(QObject):
         finally:
             if self.command_socket:
                 self.command_socket.close()
+
+    def send_command_to_client(self, client_id, command_dict):
+        """Send a JSON command to a connected client via its command socket."""
+        try:
+            info = self.connected_clients.get(client_id)
+            if not info:
+                logger.warning(f"send_command_to_client: unknown client_id {client_id}")
+                return False
+            conn = info.get('conn')
+            if not conn:
+                logger.warning(f"send_command_to_client: no conn for {client_id}")
+                return False
+            msg = json.dumps(command_dict) + "\n"
+            conn.sendall(msg.encode('utf-8'))
+            return True
+        except Exception as e:
+            logger.exception(f"Failed to send command to {client_id}: {e}")
+            return False
                 
     def _handle_client_commands(self, conn, addr, client_id):
         """Gère les commandes d'un client spécifique"""
@@ -414,7 +433,12 @@ class ScreenServer(QObject):
                                 video_port = int(command.get('video_port', VIDEO_PORT))
                                 username = command.get('username') or None
                                 # Update mapping so we send video UDP to the provided port and store username
-                                self.connected_clients[client_id] = {'ip': addr[0], 'port': video_port, 'username': username}
+                                existing = self.connected_clients.get(client_id, {})
+                                existing['ip'] = addr[0]
+                                existing['port'] = video_port
+                                existing['username'] = username
+                                # preserve existing 'conn' if present
+                                self.connected_clients[client_id] = existing
                                 logger.info(f"Registered client {client_id} -> {(addr[0], video_port)} (username={username})")
 
                                 # Démarrer automatiquement le streaming quand un client s'enregistre
