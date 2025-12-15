@@ -1,6 +1,7 @@
 """
 Fenêtre principale de l'application
 """
+import os
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
     QPushButton, QLabel, QFrame, QSplitter, QMessageBox, QDialog,
@@ -16,6 +17,11 @@ from .ui_login import LoginWindow, UserInfoWidget
 from .ui_screens import ScreenListWidget, ScreenViewer, ScreenThumbnail
 from .call_module import AudioCall, CallDialog, CallWidget, PYAUDIO_AVAILABLE
 from .ui_style import THEME, ToastOverlay, button_solid, button_outline, status_badge
+
+
+def _ui_debug(msg: str):
+    if os.getenv("SS_UI_DEBUG", "0") == "1":
+        print(f"[UI_DEBUG] {msg}", flush=True)
 
 
 class AddScreenDialog(QDialog):
@@ -360,10 +366,21 @@ class MainWindow(QMainWindow):
         # Afficher la vue zoom
         self.content_stack.setCurrentIndex(1)
 
+        _ui_debug(
+            "MainWindow.zoom_screen "
+            f"main={self.width()}x{self.height()} state={int(self.windowState())} "
+            f"central={self.centralWidget().width()}x{self.centralWidget().height()}"
+        )
+
         # Forcer le plein écran en mode zoom
         if self._pre_zoom_window_state is None:
             self._pre_zoom_window_state = self.windowState()
         self.showFullScreen()
+
+        _ui_debug(
+            "MainWindow.zoom_screen(after fullscreen) "
+            f"main={self.width()}x{self.height()} state={int(self.windowState())}"
+        )
         
     def close_zoom(self):
         """Ferme la vue zoom et revient à la liste"""
@@ -385,6 +402,11 @@ class MainWindow(QMainWindow):
         self.content_stack.setCurrentIndex(0)
         self.current_zoomed_screen = None
 
+        _ui_debug(
+            "MainWindow.close_zoom(before restore) "
+            f"main={self.width()}x{self.height()} state={int(self.windowState())}"
+        )
+
         # Restaurer l'état précédent
         if self._pre_zoom_window_state is not None:
             prev = self._pre_zoom_window_state
@@ -392,6 +414,11 @@ class MainWindow(QMainWindow):
             self.showNormal()
             if prev & Qt.WindowMaximized:
                 self.showMaximized()
+
+        _ui_debug(
+            "MainWindow.close_zoom(after restore) "
+            f"main={self.width()}x{self.height()} state={int(self.windowState())}"
+        )
         
     def toggle_screen_sharing(self):
         """Active/désactive le partage d'écran local"""

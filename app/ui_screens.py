@@ -1,6 +1,7 @@
 """
 Widgets pour l'affichage et la manipulation des écrans partagés
 """
+import os
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
     QFrame, QSizePolicy, QMenu, QToolButton, QSlider, QGridLayout, QGraphicsDropShadowEffect
@@ -12,6 +13,11 @@ from PySide6.QtGui import (
 )
 
 from .client_module import ScreenClient
+
+
+def _ui_debug(msg: str):
+    if os.getenv("SS_UI_DEBUG", "0") == "1":
+        print(f"[UI_DEBUG] {msg}", flush=True)
 
 
 class SkeletonPreview(QLabel):
@@ -86,7 +92,9 @@ class ScreenThumbnail(QFrame):
         self._shadow.setBlurRadius(18)
         self._shadow.setOffset(0, 6)
         self._shadow.setColor(QColor(0, 0, 0, 60))
-        self.setGraphicsEffect(None)
+        # Keep the effect attached; toggle via setEnabled() to avoid Qt deleting it.
+        self.setGraphicsEffect(self._shadow)
+        self._shadow.setEnabled(False)
         
         self.setFixedSize(200, 140)
         self.setFrameShape(QFrame.StyledPanel)
@@ -167,8 +175,8 @@ class ScreenThumbnail(QFrame):
                 }
             """)
 
-        # Hover affordance via shadow
-        self.setGraphicsEffect(self._shadow if self._hovered and not self.is_selected else None)
+        # Hover affordance via shadow (don't detach the effect: Qt may delete it)
+        self._shadow.setEnabled(self._hovered and not self.is_selected)
             
     def update_frame(self, image: QImage):
         """Met à jour l'image affichée"""
@@ -227,6 +235,7 @@ class ScreenViewer(QWidget):
         self.client = client
         self.current_image = None
         self.zoom_level = 1.0
+        self.fit_to_window = True
         self.is_controlling = True
         
         # Tracker l'état des touches modificatrices pour éviter de les envoyer plusieurs fois
@@ -321,7 +330,9 @@ class ScreenViewer(QWidget):
         
         # Zone d'affichage de l'écran
         self.screen_area = QScrollArea()
-        self.screen_area.setWidgetResizable(True)
+        # Keep label size driving scrollbars; we'll scale pixmap ourselves.
+        self.screen_area.setWidgetResizable(False)
+        self.screen_area.setAlignment(Qt.AlignCenter)
         self.screen_area.setStyleSheet("""
             QScrollArea {
                 background-color: #1a1a1a;
@@ -336,23 +347,57 @@ class ScreenViewer(QWidget):
         self.screen_area.setWidget(self.screen_label)
         
         layout.addWidget(self.screen_area)
+
+    def _viewport_size(self) -> QSize:
+        try:
+            return self.screen_area.viewport().size()
+        except Exception:
+            return QSize(0, 0)
+
+    def _fit_zoom_for_image(self, image: QImage) -> float:
+        vp = self._viewport_size()
+        if vp.width() <= 0 or vp.height() <= 0:
+            return 1.0
+        if image.width() <= 0 or image.height() <= 0:
+            return 1.0
+        scale = min(vp.width() / image.width(), vp.height() / image.height())
+        # Clamp to reasonable bounds.
+        return max(0.1, min(3.0, float(scale)))
         
     def update_frame(self, image: QImage):
         """Met à jour l'image affichée"""
         self.current_image = image
         if image and not image.isNull():
+            if self.fit_to_window:
+                self.zoom_level = self._fit_zoom_for_image(image)
+
             # Appliquer le zoom
-            new_size = image.size() * self.zoom_level
+            new_w = max(1, int(image.width() * self.zoom_level))
+            new_h = max(1, int(image.height() * self.zoom_level))
             scaled_image = image.scaled(
-                new_size,
+                QSize(new_w, new_h),
                 Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
+                Qt.SmoothTransformation,
             )
-            self.screen_label.setPixmap(QPixmap.fromImage(scaled_image))
-            self.screen_label.setFixedSize(scaled_image.size())
+            pm = QPixmap.fromImage(scaled_image)
+            self.screen_label.setPixmap(pm)
+            self.screen_label.resize(pm.size())
+            self.screen_label.setMinimumSize(pm.size())
+
+            self.zoom_label.setText(f"{int(self.zoom_level * 100)}%")
+
+            _ui_debug(
+                "ScreenViewer.update_frame "
+                f"img={image.width()}x{image.height()} "
+                f"viewport={self._viewport_size().width()}x{self._viewport_size().height()} "
+                f"zoom={self.zoom_level:.3f} "
+                f"pixmap={pm.width()}x{pm.height()} "
+                f"label={self.screen_label.width()}x{self.screen_label.height()}"
+            )
             
     def zoom_in(self):
         """Augmente le zoom"""
+        self.fit_to_window = False
         self.zoom_level = min(3.0, self.zoom_level + 0.25)
         self.zoom_label.setText(f"{int(self.zoom_level * 100)}%")
         if self.current_image:
@@ -360,10 +405,23 @@ class ScreenViewer(QWidget):
             
     def zoom_out(self):
         """Diminue le zoom"""
+        self.fit_to_window = False
         self.zoom_level = max(0.25, self.zoom_level - 0.25)
         self.zoom_label.setText(f"{int(self.zoom_level * 100)}%")
         if self.current_image:
             self.update_frame(self.current_image)
+
+    def resizeEvent(self, event):
+        # When fullscreen/resize happens, keep image fitted.
+        _ui_debug(
+            "ScreenViewer.resizeEvent "
+            f"viewer={self.width()}x{self.height()} "
+            f"viewport={self._viewport_size().width()}x{self._viewport_size().height()} "
+            f"fit={self.fit_to_window}"
+        )
+        if self.fit_to_window and self.current_image and not self.current_image.isNull():
+            self.update_frame(self.current_image)
+        return super().resizeEvent(event)
             
     def toggle_fullscreen(self):
         """Bascule le mode plein écran"""
