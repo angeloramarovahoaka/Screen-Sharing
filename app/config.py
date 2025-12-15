@@ -12,10 +12,10 @@ BUFFER_SIZE = 131072  # 128KB buffer for socket recv
 
 # --- CONFIGURATION VIDÉO ---
 # Résolution réduite pour garder les paquets UDP sous ~60KB
-DEFAULT_WIDTH = 640
-DEFAULT_HEIGHT = 360
-# Qualité JPEG réduite pour des paquets plus petits
-JPEG_QUALITY = 50  # Lower quality = smaller packets, better cross-network performance
+DEFAULT_WIDTH = int(os.getenv("SS_WIDTH", "800"))
+DEFAULT_HEIGHT = int(os.getenv("SS_HEIGHT", "450"))
+# Qualité JPEG (plus haut = meilleure image, plus de bande passante)
+JPEG_QUALITY = int(os.getenv("SS_JPEG_QUALITY", "75"))
 
 # Utiliser la webcam au lieu de la capture d'écran
 USE_WEBCAM = True

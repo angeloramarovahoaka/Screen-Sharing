@@ -305,13 +305,23 @@ class ScreenServer(QObject):
                         frame = imutils.resize(frame, width=DEFAULT_WIDTH)
 
                     # Encode JPEG (simple comme server-with-cam.py)
-                    encoded, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
-                    b64encoded = base64.b64encode(buffer)
+                    encode_params = [
+                        cv2.IMWRITE_JPEG_QUALITY,
+                        int(JPEG_QUALITY),
+                        cv2.IMWRITE_JPEG_OPTIMIZE,
+                        1,
+                        cv2.IMWRITE_JPEG_PROGRESSIVE,
+                        1,
+                    ]
+                    encoded, buffer = cv2.imencode('.jpg', frame, encode_params)
+                    if not encoded:
+                        continue
+                    jpeg_bytes = buffer.tobytes()
 
-                    # Send to all connected clients (simple UDP broadcast)
+                    # Send to all connected clients (UDP)
                     for client_id, client_addr in list(self.connected_clients.items()):
                         try:
-                            self.video_socket.sendto(b64encoded, client_addr)
+                            self.video_socket.sendto(jpeg_bytes, client_addr)
                             frame_count += 1
                             if frame_count % 100 == 0:
                                 logger.info(f"Sent {frame_count} frames to {client_addr}")

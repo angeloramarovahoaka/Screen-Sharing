@@ -206,11 +206,15 @@ class ScreenClient(QObject):
                 packet, addr = self.video_socket.recvfrom(BUFFER_SIZE)
                 timeout_count = 0  # Reset sur réception réussie
                 
-                # Décoder directement (comme client-with-cam.py)
+                # Décoder directement (JPEG bytes), fallback base64 pour compatibilité
                 try:
-                    data = base64.b64decode(packet)
-                    npdata = np.frombuffer(data, dtype=np.uint8)
+                    npdata = np.frombuffer(packet, dtype=np.uint8)
                     frame = cv2.imdecode(npdata, cv2.IMREAD_COLOR)
+
+                    if frame is None:
+                        data = base64.b64decode(packet)
+                        npdata = np.frombuffer(data, dtype=np.uint8)
+                        frame = cv2.imdecode(npdata, cv2.IMREAD_COLOR)
                     
                     if frame is not None:
                         frame_count += 1
