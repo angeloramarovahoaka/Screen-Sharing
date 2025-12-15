@@ -139,15 +139,15 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.call_widget)
         
         # Barre d'outils
-        toolbar = QFrame()
-        toolbar.setFixedHeight(50)
-        toolbar.setStyleSheet("""
+        self.main_toolbar = QFrame()
+        self.main_toolbar.setFixedHeight(50)
+        self.main_toolbar.setStyleSheet("""
             QFrame {
                 background-color: white;
                 border-bottom: 1px solid #e0e0e0;
             }
         """)
-        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout = QHBoxLayout(self.main_toolbar)
         toolbar_layout.setContentsMargins(15, 5, 15, 5)
         
         # Boutons de la barre d'outils
@@ -171,7 +171,7 @@ class MainWindow(QMainWindow):
         self.app_status_badge.setAlignment(Qt.AlignCenter)
         toolbar_layout.addWidget(self.app_status_badge)
         
-        main_layout.addWidget(toolbar)
+        main_layout.addWidget(self.main_toolbar)
         
         # Zone principale avec stack
         self.content_stack = QStackedWidget()
@@ -375,6 +375,25 @@ class MainWindow(QMainWindow):
         # Forcer le plein écran en mode zoom
         if self._pre_zoom_window_state is None:
             self._pre_zoom_window_state = self.windowState()
+
+        # Masquer les panneaux du haut/bas pour ne rien cacher de l'écran partagé
+        try:
+            self.user_bar.hide()
+        except Exception:
+            pass
+        try:
+            self.call_widget.hide()
+        except Exception:
+            pass
+        try:
+            self.main_toolbar.hide()
+        except Exception:
+            pass
+        try:
+            self.statusBar().hide()
+        except Exception:
+            pass
+
         self.showFullScreen()
 
         _ui_debug(
@@ -414,6 +433,24 @@ class MainWindow(QMainWindow):
             self.showNormal()
             if prev & Qt.WindowMaximized:
                 self.showMaximized()
+
+        # Restaurer les panneaux
+        try:
+            self.user_bar.show()
+        except Exception:
+            pass
+        try:
+            self.call_widget.show()
+        except Exception:
+            pass
+        try:
+            self.main_toolbar.show()
+        except Exception:
+            pass
+        try:
+            self.statusBar().show()
+        except Exception:
+            pass
 
         _ui_debug(
             "MainWindow.close_zoom(after restore) "
