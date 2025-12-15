@@ -3,15 +3,68 @@ Widgets pour l'affichage et la manipulation des écrans partagés
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QFrame, QSizePolicy, QMenu, QToolButton, QSlider, QGridLayout
+    QFrame, QSizePolicy, QMenu, QToolButton, QSlider, QGridLayout, QGraphicsDropShadowEffect
 )
 from PySide6.QtCore import Signal, Qt, QSize, QPoint, QTimer
 from PySide6.QtGui import (
     QImage, QPixmap, QPainter, QFont, QMouseEvent, 
-    QKeyEvent, QWheelEvent, QCursor
+    QKeyEvent, QWheelEvent, QCursor, QColor, QLinearGradient
 )
 
 from .client_module import ScreenClient
+
+
+class SkeletonPreview(QLabel):
+    """Preview area with an animated skeleton shimmer until a pixmap is set."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._phase = 0.0
+        self._timer = QTimer(self)
+        self._timer.setInterval(33)  # ~30fps
+        self._timer.timeout.connect(self._tick)
+        self._timer.start()
+
+        self.setAlignment(Qt.AlignCenter)
+        self.setMinimumSize(190, 100)
+        self.setText("📺 En attente…")
+
+    def _tick(self):
+        # Only animate when we don't have a real pixmap.
+        pm = self.pixmap()
+        if pm is not None and not pm.isNull():
+            return
+        self._phase = (self._phase + 0.035) % 1.0
+        self.update()
+
+    def paintEvent(self, event):
+        pm = self.pixmap()
+        if pm is not None and not pm.isNull():
+            return super().paintEvent(event)
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        r = self.rect()
+
+        # Background
+        painter.fillRect(r, QColor("#1a1a1a"))
+
+        # Shimmer
+        w = max(1, r.width())
+        offset = int((self._phase * (w + 120)) - 120)
+        grad = QLinearGradient(offset, 0, offset + 120, 0)
+        grad.setColorAt(0.0, QColor(255, 255, 255, 0))
+        grad.setColorAt(0.5, QColor(255, 255, 255, 26))
+        grad.setColorAt(1.0, QColor(255, 255, 255, 0))
+        painter.fillRect(r, grad)
+
+        # Text hint
+        painter.setPen(QColor("#666"))
+        painter.setFont(QFont("Segoe UI", 9))
+        painter.drawText(r, Qt.AlignCenter, self.text())
+
+        painter.end()
 
 
 class ScreenThumbnail(QFrame):
@@ -28,6 +81,12 @@ class ScreenThumbnail(QFrame):
         self.screen_name = screen_name
         self.is_selected = False
         self.current_image = None
+        self._hovered = False
+        self._shadow = QGraphicsDropShadowEffect(self)
+        self._shadow.setBlurRadius(18)
+        self._shadow.setOffset(0, 6)
+        self._shadow.setColor(QColor(0, 0, 0, 60))
+        self.setGraphicsEffect(None)
         
         self.setFixedSize(200, 140)
         self.setFrameShape(QFrame.StyledPanel)
@@ -41,19 +100,11 @@ class ScreenThumbnail(QFrame):
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(5)
         
-        # Zone d'affichage de l'écran
-        self.screen_label = QLabel()
-        self.screen_label.setAlignment(Qt.AlignCenter)
-        self.screen_label.setMinimumSize(190, 100)
-        self.screen_label.setStyleSheet("background-color: #1a1a1a; border-radius: 3px;")
-        self.screen_label.setText("📺 En attente...")
-        self.screen_label.setStyleSheet("""
-            QLabel {
-                background-color: #1a1a1a;
-                color: #666;
-                border-radius: 3px;
-            }
-        """)
+        # Zone d'affichage de l'écran (skeleton animé tant qu'aucune frame)
+        self.screen_label = SkeletonPreview()
+        self.screen_label.setStyleSheet(
+            "QLabel { border-radius: 6px; }"
+        )
         layout.addWidget(self.screen_label)
         
         # Barre d'info
@@ -115,6 +166,9 @@ class ScreenThumbnail(QFrame):
                     border-color: #2196F3;
                 }
             """)
+
+        # Hover affordance via shadow
+        self.setGraphicsEffect(self._shadow if self._hovered and not self.is_selected else None)
             
     def update_frame(self, image: QImage):
         """Met à jour l'image affichée"""
@@ -127,6 +181,7 @@ class ScreenThumbnail(QFrame):
                 Qt.SmoothTransformation
             )
             self.screen_label.setPixmap(scaled)
+            self.screen_label.setText("")
             
     def set_selected(self, selected):
         """Définit l'état de sélection"""
@@ -148,6 +203,16 @@ class ScreenThumbnail(QFrame):
         if event.button() == Qt.LeftButton:
             self.double_clicked.emit(self.screen_id)
         super().mouseDoubleClickEvent(event)
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self.update_style()
+        return super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self.update_style()
+        return super().leaveEvent(event)
 
 
 class ScreenViewer(QWidget):

@@ -9,6 +9,7 @@ from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QFont, QPixmap, QPalette, QColor
 
 from .config import USERS, app_state
+from .ui_style import THEME, button_solid
 
 
 class LoginWindow(QWidget):
@@ -35,7 +36,7 @@ class LoginWindow(QWidget):
         title_label.setAlignment(Qt.AlignCenter)
         title_font = QFont("Segoe UI", 24, QFont.Bold)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #2196F3;")
+        title_label.setStyleSheet(f"color: {THEME.primary};")
         main_layout.addWidget(title_label)
         
         # Sous-titre
@@ -70,6 +71,7 @@ class LoginWindow(QWidget):
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Entrez votre nom d'utilisateur")
         self.username_input.setMinimumHeight(40)
+        self.username_input.returnPressed.connect(lambda: self.password_input.setFocus())
         login_layout.addWidget(self.username_input)
         
         # Champ mot de passe
@@ -83,11 +85,19 @@ class LoginWindow(QWidget):
         self.password_input.setMinimumHeight(40)
         self.password_input.returnPressed.connect(self.handle_login)
         login_layout.addWidget(self.password_input)
+
+        # Erreur inline (évite les popups intrusives)
+        self.error_label = QLabel("")
+        self.error_label.setWordWrap(True)
+        self.error_label.setStyleSheet("color: #f44336; font-size: 11px;")
+        self.error_label.hide()
+        login_layout.addWidget(self.error_label)
         
         # Bouton de connexion
         self.login_button = QPushButton("Se connecter")
         self.login_button.setMinimumHeight(45)
         self.login_button.setCursor(Qt.PointingHandCursor)
+        self.login_button.setStyleSheet(button_solid(THEME.primary, THEME.primary_hover, padding="12px 18px"))
         self.login_button.clicked.connect(self.handle_login)
         login_layout.addWidget(self.login_button)
         
@@ -101,6 +111,9 @@ class LoginWindow(QWidget):
         info_label.setAlignment(Qt.AlignCenter)
         info_label.setStyleSheet("color: #999; font-size: 9px;")
         main_layout.addWidget(info_label)
+
+        # Focus direct
+        self.username_input.setFocus()
         
     def apply_style(self):
         """Applique le style à la fenêtre"""
@@ -120,33 +133,21 @@ class LoginWindow(QWidget):
             QLineEdit:focus {
                 border-color: #2196F3;
             }
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;
-            }
-            QPushButton:pressed {
-                background-color: #1565C0;
-            }
+            /* Le style du bouton principal est appliqué sur login_button */
         """)
         
     def handle_login(self):
         """Gère la tentative de connexion"""
         username = self.username_input.text().strip()
         password = self.password_input.text()
+
+        self.error_label.hide()
+        self.username_input.setStyleSheet("")
+        self.password_input.setStyleSheet("")
         
         if not username or not password:
-            QMessageBox.warning(
-                self, 
-                "Champs requis", 
-                "Veuillez remplir tous les champs."
-            )
+            self.error_label.setText("Veuillez remplir tous les champs.")
+            self.error_label.show()
             return
             
         # Vérification des identifiants
@@ -154,11 +155,8 @@ class LoginWindow(QWidget):
             app_state.login(username)
             self.login_successful.emit(username)
         else:
-            QMessageBox.critical(
-                self,
-                "Échec de connexion",
-                "Nom d'utilisateur ou mot de passe incorrect."
-            )
+            self.error_label.setText("Nom d'utilisateur ou mot de passe incorrect.")
+            self.error_label.show()
             self.password_input.clear()
             self.password_input.setFocus()
             

@@ -15,6 +15,7 @@ from .server_module import ScreenServer
 from .ui_login import LoginWindow, UserInfoWidget
 from .ui_screens import ScreenListWidget, ScreenViewer, ScreenThumbnail
 from .call_module import AudioCall, CallDialog, CallWidget, PYAUDIO_AVAILABLE
+from .ui_style import THEME, ToastOverlay, button_solid, button_outline, status_badge
 
 
 class AddScreenDialog(QDialog):
@@ -145,60 +146,30 @@ class MainWindow(QMainWindow):
         # Boutons de la barre d'outils
         self.add_screen_btn = QPushButton("➕ Ajouter écran")
         self.add_screen_btn.setCursor(Qt.PointingHandCursor)
-        self.add_screen_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 10px 20px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #43A047;
-            }
-        """)
+        self.add_screen_btn.setStyleSheet(button_outline(THEME.success, hover_bg="rgba(76,175,80,0.10)", padding="9px 14px"))
+        self.add_screen_btn.setMinimumHeight(38)
         toolbar_layout.addWidget(self.add_screen_btn)
         
         self.share_screen_btn = QPushButton("📤 Partager mon écran")
         self.share_screen_btn.setCursor(Qt.PointingHandCursor)
-        self.share_screen_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 10px 20px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;
-            }
-        """)
+        self.share_screen_btn.setStyleSheet(button_solid(THEME.primary, THEME.primary_hover, padding="11px 18px"))
+        self.share_screen_btn.setMinimumHeight(40)
         toolbar_layout.addWidget(self.share_screen_btn)
         
         toolbar_layout.addStretch()
+
+        # Badge d'état global (Idle / Connected / Streaming)
+        self.app_status_badge = QLabel("Idle")
+        self.app_status_badge.setStyleSheet(status_badge(THEME.danger))
+        self.app_status_badge.setAlignment(Qt.AlignCenter)
+        toolbar_layout.addWidget(self.app_status_badge)
         
         # Bouton d'appel
         self.call_btn = QPushButton("📞 Appeler")
         self.call_btn.setCursor(Qt.PointingHandCursor)
         self.call_btn.setEnabled(PYAUDIO_AVAILABLE)
-        self.call_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #9C27B0;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 10px 20px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #7B1FA2;
-            }
-            QPushButton:disabled {
-                background-color: #ccc;
-            }
-        """)
+        self.call_btn.setStyleSheet(button_solid(THEME.accent, THEME.accent_hover, padding="9px 14px"))
+        self.call_btn.setMinimumHeight(38)
         toolbar_layout.addWidget(self.call_btn)
         
         main_layout.addWidget(toolbar)
@@ -217,11 +188,41 @@ class MainWindow(QMainWindow):
         self.content_stack.addWidget(self.zoom_container)
         
         main_layout.addWidget(self.content_stack)
+
+        # Toast overlay (snackbar)
+        self.toast = ToastOverlay(central_widget)
+        self.toast.setGeometry(central_widget.rect())
         
         # Barre de statut
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("Prêt")
+
+        self._refresh_app_status()
+
+    def _set_app_status(self, status: str):
+        status = (status or "Idle").strip()
+        if status.lower() == "streaming":
+            self.app_status_badge.setText("Streaming")
+            self.app_status_badge.setStyleSheet(status_badge(THEME.success))
+        elif status.lower() == "connected":
+            self.app_status_badge.setText("Connected")
+            self.app_status_badge.setStyleSheet(status_badge("#FFB300", fg="#1a1a1a"))
+        else:
+            self.app_status_badge.setText("Idle")
+            self.app_status_badge.setStyleSheet(status_badge(THEME.danger))
+
+    def _refresh_app_status(self):
+        # Streaming local takes precedence.
+        if getattr(self.server, "is_streaming", False):
+            self._set_app_status("Streaming")
+            return
+
+        # Any connected remote screen client => Connected
+        if getattr(self.multi_client, "clients", None) and len(self.multi_client.clients) > 0:
+            self._set_app_status("Connected")
+        else:
+            self._set_app_status("Idle")
         
     def setup_connections(self):
         """Configure les connexions de signaux"""
@@ -243,6 +244,7 @@ class MainWindow(QMainWindow):
         
         # Serveur
         self.server.status_changed.connect(lambda s: self.status_bar.showMessage(s))
+        self.server.status_changed.connect(lambda _s: self._refresh_app_status())
         self.server.client_connected.connect(lambda c: self.status_bar.showMessage(f"Client connecté: {c}"))
         
         # Appel
@@ -305,12 +307,15 @@ class MainWindow(QMainWindow):
             # Ajouter à la liste visuelle
             self.screen_list.add_screen(screen_id, name)
             self.status_bar.showMessage(f"Connecté à {name} ({ip})")
+            self.toast.show_toast(f"Connexion réussie: {name} ({ip})", kind="success")
+            self._refresh_app_status()
         else:
             QMessageBox.warning(
                 self,
                 "Erreur de connexion",
                 f"Impossible de se connecter à {ip}"
             )
+            self.toast.show_toast(f"Connexion impossible: {ip}", kind="error")
             
     def remove_screen(self, screen_id):
         """Déconnecte et retire un écran"""
@@ -319,6 +324,8 @@ class MainWindow(QMainWindow):
             del self.multi_client.clients[screen_id]
             
         self.screen_list.remove_screen(screen_id)
+
+        self._refresh_app_status()
         
         # Revenir à la liste si on était en zoom sur cet écran
         if self.current_zoomed_screen == screen_id:
@@ -387,19 +394,9 @@ class MainWindow(QMainWindow):
             # Arrêter le streaming
             self.server.stop_streaming()
             self.share_screen_btn.setText("📤 Partager mon écran")
-            self.share_screen_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #2196F3;
-                    color: white;
-                    border: none;
-                    border-radius: 5px;
-                    padding: 10px 20px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #1976D2;
-                }
-            """)
+            self.share_screen_btn.setStyleSheet(button_solid(THEME.primary, THEME.primary_hover, padding="11px 18px"))
+            self.toast.show_toast("Partage arrêté", kind="info")
+            self._refresh_app_status()
         else:
             # Demander l'IP du client
             dialog = QDialog(self)
@@ -437,19 +434,9 @@ class MainWindow(QMainWindow):
                     # Démarrer le streaming vidéo
                     self.server.start_streaming()
                     self.share_screen_btn.setText("🛑 Arrêter le partage")
-                    self.share_screen_btn.setStyleSheet("""
-                        QPushButton {
-                            background-color: #f44336;
-                            color: white;
-                            border: none;
-                            border-radius: 5px;
-                            padding: 10px 20px;
-                            font-weight: bold;
-                        }
-                        QPushButton:hover {
-                            background-color: #d32f2f;
-                        }
-                    """)
+                    self.share_screen_btn.setStyleSheet(button_solid(THEME.danger, THEME.danger_hover, padding="11px 18px"))
+                    self.toast.show_toast(f"Streaming démarré vers {client_ip}", kind="success")
+                    self._refresh_app_status()
                     
     def show_call_dialog(self):
         """Affiche le dialog pour passer un appel"""
@@ -464,13 +451,16 @@ class MainWindow(QMainWindow):
         """Démarre un appel"""
         if self.audio_call.start_call(peer_ip):
             self.status_bar.showMessage(f"Appel en cours avec {peer_ip}")
+            self.toast.show_toast(f"Appel démarré: {peer_ip}", kind="success")
         else:
             QMessageBox.warning(self, "Erreur", "Impossible de démarrer l'appel")
+            self.toast.show_toast("Impossible de démarrer l'appel", kind="error")
             
     def end_call(self):
         """Termine l'appel"""
         self.audio_call.end_call()
         self.status_bar.showMessage("Appel terminé")
+        self.toast.show_toast("Appel terminé", kind="info")
         
     def toggle_mute(self):
         """Bascule le mode muet"""
