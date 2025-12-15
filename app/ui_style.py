@@ -118,7 +118,7 @@ class ToastOverlay(QWidget):
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(12, 12, 12, 12)
         self._layout.setSpacing(8)
-        self._layout.setAlignment(Qt.AlignTop | Qt.AlignRight)
+        self._layout.setAlignment(Qt.AlignBottom | Qt.AlignRight)
 
         self.hide()
 
