@@ -24,6 +24,13 @@ def _ui_debug(msg: str):
         print(f"[UI_DEBUG] {msg}", flush=True)
 
 
+def _qt_flag_to_int(flag) -> int:
+    try:
+        return int(flag)
+    except TypeError:
+        return int(getattr(flag, "value", 0))
+
+
 class AddScreenDialog(QDialog):
     """Dialog pour ajouter une nouvelle connexion d'écran"""
     
@@ -405,7 +412,7 @@ class MainWindow(QMainWindow):
 
         _ui_debug(
             "MainWindow.zoom_screen "
-            f"main={self.width()}x{self.height()} state={int(self.windowState())} "
+            f"main={self.width()}x{self.height()} state={_qt_flag_to_int(self.windowState())} "
             f"central={self.centralWidget().width()}x{self.centralWidget().height()}"
         )
 
@@ -435,7 +442,7 @@ class MainWindow(QMainWindow):
 
         _ui_debug(
             "MainWindow.zoom_screen(after fullscreen) "
-            f"main={self.width()}x{self.height()} state={int(self.windowState())}"
+            f"main={self.width()}x{self.height()} state={_qt_flag_to_int(self.windowState())}"
         )
         
     def close_zoom(self):
@@ -460,7 +467,7 @@ class MainWindow(QMainWindow):
 
         _ui_debug(
             "MainWindow.close_zoom(before restore) "
-            f"main={self.width()}x{self.height()} state={int(self.windowState())}"
+            f"main={self.width()}x{self.height()} state={_qt_flag_to_int(self.windowState())}"
         )
 
         # Restaurer l'état précédent
@@ -491,7 +498,7 @@ class MainWindow(QMainWindow):
 
         _ui_debug(
             "MainWindow.close_zoom(after restore) "
-            f"main={self.width()}x{self.height()} state={int(self.windowState())}"
+            f"main={self.width()}x{self.height()} state={_qt_flag_to_int(self.windowState())}"
         )
         
     def toggle_screen_sharing(self):
