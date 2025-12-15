@@ -315,6 +315,14 @@ class MainWindow(QMainWindow):
             client.frame_received.connect(
                 lambda img, sid=screen_id: self._on_screen_frame_updated(sid, img)
             )
+
+            # Notifier quand le partage distant s'arrête
+            try:
+                client.stream_state_changed.connect(
+                    lambda state, sid=screen_id: self._on_remote_stream_state(sid, state)
+                )
+            except Exception:
+                pass
             
             # Ajouter à la liste visuelle
             self.screen_list.add_screen(screen_id, name)
@@ -342,6 +350,21 @@ class MainWindow(QMainWindow):
         # Revenir à la liste si on était en zoom sur cet écran
         if self.current_zoomed_screen == screen_id:
             self.close_zoom()
+
+    def _on_remote_stream_state(self, screen_id: str, state: str):
+        state = (state or "").strip().lower()
+        if state == "stopped":
+            try:
+                self.toast.show_toast("Partage arrêté", kind="info")
+            except Exception:
+                pass
+
+            # Si l'utilisateur regardait ce stream en zoom, revenir à la liste
+            if self.current_zoomed_screen == screen_id:
+                try:
+                    self.close_zoom()
+                except Exception:
+                    pass
             
     def zoom_screen(self, screen_id):
         """Ouvre la vue zoom pour un écran"""

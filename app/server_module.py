@@ -17,6 +17,7 @@ from pynput.keyboard import Controller as KeyboardController, Key
 import logging
 import os
 from logging.handlers import RotatingFileHandler, DatagramHandler
+from typing import Dict, Optional
 
 # Import pour la gestion des touches spéciales sur Windows
 if platform.system() == 'Windows':
@@ -100,6 +101,10 @@ class ScreenServer(QObject):
         # Threads
         self.video_thread = None
         self.command_thread = None
+
+        # Active TCP command connections (for server -> client notifications)
+        self._command_conns: Dict[str, socket.socket] = {}
+        self._command_conns_lock = threading.Lock()
         
         # Mapping des boutons souris
         self.button_map = {
@@ -232,6 +237,9 @@ class ScreenServer(QObject):
         self.video_thread.start()
         self.status_changed.emit("Streaming vidéo démarré")
         logger.info("Video streaming started on demand")
+
+        # Notify viewers (best-effort)
+        self._broadcast_control({"type": "stream", "state": "started"})
     
     def stop_streaming(self):
         """Arrête le streaming vidéo"""
@@ -244,12 +252,41 @@ class ScreenServer(QObject):
                 pass
         self.status_changed.emit("Streaming vidéo arrêté")
         logger.info("Video streaming stopped")
+
+        # Notify viewers (best-effort)
+        self._broadcast_control({"type": "stream", "state": "stopped"})
+
+    def _broadcast_control(self, message: dict):
+        """Envoie un message JSON (ligne) à tous les clients connectés (best-effort)."""
+        try:
+            payload = (json.dumps(message) + "\n").encode("utf-8")
+        except Exception:
+            return
+
+        stale = []
+        with self._command_conns_lock:
+            for client_id, conn in list(self._command_conns.items()):
+                try:
+                    conn.sendall(payload)
+                except Exception:
+                    stale.append(client_id)
+
+            for client_id in stale:
+                try:
+                    conn = self._command_conns.pop(client_id, None)
+                    if conn:
+                        conn.close()
+                except Exception:
+                    pass
         
     def stop(self):
         """Arrête le serveur"""
         self.is_running = False
         self.is_streaming = False
         logger.info("Stopping ScreenServer")
+
+        # Best-effort notify viewers that streaming is stopping (and server is going away)
+        self._broadcast_control({"type": "stream", "state": "stopped"})
         
         if self.video_socket:
             try:
@@ -262,6 +299,15 @@ class ScreenServer(QObject):
                 self.command_socket.close()
             except:
                 pass
+
+        # Close active command connections
+        with self._command_conns_lock:
+            for _, conn in list(self._command_conns.items()):
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            self._command_conns.clear()
                 
         self.status_changed.emit("Serveur arrêté")
         logger.info("Serveur arrêté (signals emitted)")
@@ -367,6 +413,10 @@ class ScreenServer(QObject):
                     self.connected_clients[client_id] = (addr[0], VIDEO_PORT)
                     self.client_connected.emit(client_id)
                     logger.info(f"Accepted command connection from {addr}; registered client_id={client_id}")
+
+                    # Keep the TCP connection so we can notify this viewer later
+                    with self._command_conns_lock:
+                        self._command_conns[client_id] = conn
                     
                     # Traiter les commandes de ce client
                     client_thread = threading.Thread(
@@ -440,6 +490,11 @@ class ScreenServer(QObject):
             logger.exception(f"Exception in client command handler for {client_id}: {e}")
         finally:
             conn.close()
+            with self._command_conns_lock:
+                try:
+                    self._command_conns.pop(client_id, None)
+                except Exception:
+                    pass
             if client_id in self.connected_clients:
                 del self.connected_clients[client_id]
             self.client_disconnected.emit(client_id)

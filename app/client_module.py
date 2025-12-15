@@ -58,6 +58,7 @@ class ScreenClient(QObject):
     """
     frame_received = Signal(QImage)
     status_changed = Signal(str)
+    stream_state_changed = Signal(str)  # 'started' | 'stopped'
     connected = Signal()
     disconnected = Signal()
     error_occurred = Signal(str)
@@ -81,6 +82,7 @@ class ScreenClient(QObject):
         
         # Thread de réception
         self.receive_thread = None
+        self.control_thread = None
         
         # Listeners clavier/souris (optionnels, pour capture globale)
         self.keyboard_listener = None
@@ -119,6 +121,14 @@ class ScreenClient(QObject):
             # Démarrer le thread de réception (doit être lancé avant d'attendre des paquets)
             self.receive_thread = threading.Thread(target=self._receive_video, daemon=True)
             self.receive_thread.start()
+
+            # Start control receiver (server -> client notifications) over the same TCP socket
+            try:
+                self.command_socket.settimeout(0.5)
+            except Exception:
+                pass
+            self.control_thread = threading.Thread(target=self._receive_control, daemon=True)
+            self.control_thread.start()
 
             # Inform the server which UDP port we listen on for video (register)
             try:
@@ -192,6 +202,44 @@ class ScreenClient(QObject):
         self.latest_frame = None
         self.status_changed.emit("Déconnecté")
         self.disconnected.emit()
+
+    def _receive_control(self):
+        """Thread de réception des messages de contrôle via TCP (JSON lines)."""
+        buf = b""
+        while self.is_running and self.is_connected and self.command_socket:
+            try:
+                chunk = self.command_socket.recv(4096)
+                if not chunk:
+                    break
+                buf += chunk
+                while b"\n" in buf:
+                    line, buf = buf.split(b"\n", 1)
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        msg = json.loads(line.decode("utf-8", errors="replace"))
+                    except Exception:
+                        continue
+
+                    if isinstance(msg, dict) and msg.get("type") == "stream":
+                        state = str(msg.get("state", "")).strip().lower()
+                        if state in {"started", "stopped"}:
+                            self.stream_state_changed.emit(state)
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            except Exception as e:
+                logger.debug(f"[CTRL-RX] Error: {e}")
+                break
+
+        # If we exit unexpectedly while still marked connected, trigger disconnect
+        if self.is_running and self.is_connected:
+            try:
+                self.disconnect()
+            except Exception:
+                pass
         
     def _receive_video(self):
         """Thread de réception du flux vidéo (simple comme client-with-cam.py)"""
