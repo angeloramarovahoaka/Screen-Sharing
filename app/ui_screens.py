@@ -707,6 +707,8 @@ class ScreenListWidget(QWidget):
         # Titre
         title = QLabel("📺 Écrans connectés")
         title.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        # Texte foncé pour contraste sur fond clair (comme le nom d'utilisateur)
+        title.setStyleSheet("color: #111111;")
         layout.addWidget(title)
         
         # Zone de scroll pour les miniatures

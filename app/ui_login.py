@@ -28,8 +28,8 @@ class LoginWindow(QWidget):
     def setup_ui(self):
         """Configure l'interface utilisateur"""
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(40, 40, 40, 40)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(24, 24, 24, 24)
+        main_layout.setSpacing(12)
         
         # Logo / Titre
         title_label = QLabel("🖥️ Screen Sharing")
@@ -48,7 +48,7 @@ class LoginWindow(QWidget):
         main_layout.addWidget(subtitle_label)
         
         # Espace
-        main_layout.addSpacing(30)
+        main_layout.addSpacing(12)
         
         # Frame de connexion
         login_frame = QFrame()
@@ -57,19 +57,21 @@ class LoginWindow(QWidget):
             QFrame {
                 background-color: #f5f5f5;
                 border-radius: 10px;
-                padding: 20px;
+                padding: 14px;
             }
         """)
         login_layout = QVBoxLayout(login_frame)
-        login_layout.setSpacing(15)
+        login_layout.setSpacing(10)
         
         # Champ utilisateur
         user_label = QLabel("👤 Nom d'utilisateur")
         user_label.setFont(QFont("Segoe UI", 10))
+        user_label.setStyleSheet("color: #111;")
         login_layout.addWidget(user_label)
         
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Entrez votre nom d'utilisateur")
+        self.username_input.setStyleSheet("color: #111;")
         self.username_input.setMinimumHeight(40)
         self.username_input.returnPressed.connect(lambda: self.password_input.setFocus())
         login_layout.addWidget(self.username_input)
@@ -77,7 +79,9 @@ class LoginWindow(QWidget):
         # Champ mot de passe
         pass_label = QLabel("🔒 Mot de passe")
         pass_label.setFont(QFont("Segoe UI", 10))
+        pass_label.setStyleSheet("color: #111;")
         login_layout.addWidget(pass_label)
+
         
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Entrez votre mot de passe")
@@ -95,9 +99,9 @@ class LoginWindow(QWidget):
         
         # Bouton de connexion
         self.login_button = QPushButton("Se connecter")
-        self.login_button.setMinimumHeight(45)
+        self.login_button.setMinimumHeight(42)
         self.login_button.setCursor(Qt.PointingHandCursor)
-        self.login_button.setStyleSheet(button_solid(THEME.primary, THEME.primary_hover, padding="12px 18px"))
+        self.login_button.setStyleSheet(button_solid(THEME.primary, THEME.primary_hover, padding="10px 14px"))
         self.login_button.clicked.connect(self.handle_login)
         login_layout.addWidget(self.login_button)
         
@@ -109,7 +113,7 @@ class LoginWindow(QWidget):
         # Info comptes de test
         info_label = QLabel("Comptes de test:\nadmin / admin123\nuser1 / password1")
         info_label.setAlignment(Qt.AlignCenter)
-        info_label.setStyleSheet("color: #999; font-size: 9px;")
+        info_label.setStyleSheet("color: #999; font-size: 10px;")
         main_layout.addWidget(info_label)
 
         # Focus direct
@@ -190,6 +194,8 @@ class UserInfoWidget(QWidget):
         # Nom d'utilisateur
         self.username_label = QLabel("Non connecté")
         self.username_label.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        # Texte foncé pour contraste sur fond clair
+        self.username_label.setStyleSheet("color: #111111;")
         layout.addWidget(self.username_label)
         
         layout.addStretch()

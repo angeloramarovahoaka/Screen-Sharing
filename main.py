@@ -122,9 +122,13 @@ class ScreenSharingApp:
         self.main_window.set_user(username)
         self.main_window.show()
         
-        # Reconnecter pour permettre la déconnexion
-        # La MainWindow émet déjà le signal de logout qui ferme la fenêtre
-        # On surveille la fermeture pour revenir au login
+        # Connecter le signal de déconnexion pour revenir à l'écran de login
+        try:
+            self.main_window.logged_out.connect(self.show_login)
+        except Exception:
+            pass
+
+        # Surveiller la fermeture au cas où la fenêtre serait fermée autrement
         self.main_window.destroyed.connect(self.on_main_window_closed)
         
     def on_main_window_closed(self):

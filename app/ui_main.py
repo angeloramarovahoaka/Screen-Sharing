@@ -90,6 +90,8 @@ class MainWindow(QMainWindow):
     """
     Fenêtre principale de l'application Screen Sharing
     """
+    # Signal émis quand l'utilisateur se déconnecte (retourner à l'écran de login)
+    logged_out = Signal()
     
     def __init__(self):
         super().__init__()
@@ -275,8 +277,20 @@ class MainWindow(QMainWindow):
             for screen_id in list(self.screen_list.thumbnails.keys()):
                 self.screen_list.remove_screen(screen_id)
                 
+            # Mettre l'état en déconnecté
             app_state.logout()
-            self.close()
+
+            # Emettre un signal pour demander au contrôleur d'afficher l'écran de login
+            try:
+                self.logged_out.emit()
+            except Exception:
+                pass
+
+            # Cacher la fenêtre principale (ne pas quitter l'application)
+            try:
+                self.hide()
+            except Exception:
+                pass
             
     def show_add_screen_dialog(self):
         """Affiche le dialog d'ajout d'écran"""
