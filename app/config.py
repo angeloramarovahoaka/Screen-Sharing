@@ -33,6 +33,9 @@ USERS = {
     "user2": "password2"
 }
 
+# Adresse IP du serveur (fixée dans le code client, ne pas demander à l'utilisateur)
+SERVER_IP = os.getenv('SS_SERVER_IP', '127.0.0.1')
+
 # --- ÉTAT DE L'APPLICATION ---
 class AppState:
     """État global de l'application"""

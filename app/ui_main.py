@@ -238,6 +238,9 @@ class MainWindow(QMainWindow):
         self.server.status_changed.connect(lambda s: self.status_bar.showMessage(s))
         self.server.status_changed.connect(lambda _s: self._refresh_app_status())
         self.server.client_connected.connect(lambda c: self.status_bar.showMessage(f"Client connecté: {c}"))
+        # UI update hooks for client list (ADMIN)
+        self.server.client_connected.connect(self._on_server_client_connected)
+        self.server.client_disconnected.connect(self._on_server_client_disconnected)
         
         # Appel
         self.call_widget.end_call_requested.connect(self.end_call)
@@ -249,6 +252,30 @@ class MainWindow(QMainWindow):
         """Définit l'utilisateur connecté"""
         self.user_bar.set_username(username)
         self.status_bar.showMessage(f"Connecté en tant que {username}")
+        # Adjust UI and background behavior depending on role
+        from .config import SERVER_IP
+        if username == 'admin':
+            # ADMIN: start command listener automatically and show connected clients
+            if not self.server.is_running:
+                self.server.start()
+            self.add_screen_btn.setVisible(True)
+            self.add_screen_btn.setEnabled(True)
+            self.share_screen_btn.setEnabled(True)
+        else:
+            # CLIENT: hide controls that require manual IPs and auto-connect to configured server
+            self.add_screen_btn.setVisible(False)
+            self.share_screen_btn.setEnabled(False)
+            # Auto-connect as a viewer to the configured server IP
+            client = ScreenClient()
+            screen_id = f"server_{SERVER_IP}"
+            if client.connect_to_server(None):
+                self.multi_client.clients[screen_id] = client
+                client.frame_received.connect(
+                    lambda img, sid=screen_id: self._on_screen_frame_updated(sid, img)
+                )
+                self.screen_list.add_screen(screen_id, f"Serveur ({SERVER_IP})")
+                self.toast.show_toast(f"Connecté automatiquement à {SERVER_IP}", kind="success")
+                self._refresh_app_status()
         
     def handle_logout(self):
         """Gère la déconnexion"""
@@ -273,12 +300,8 @@ class MainWindow(QMainWindow):
             self.close()
             
     def show_add_screen_dialog(self):
-        """Affiche le dialog d'ajout d'écran"""
-        dialog = AddScreenDialog(self)
-        if dialog.exec() == QDialog.Accepted:
-            name, ip = dialog.get_values()
-            if name and ip:
-                self.add_screen(name, ip)
+        # Manual add disabled: use automatic connections via server/client roles
+        pass
                 
     def add_screen(self, name, ip):
         """Ajoute une connexion à un écran distant"""
@@ -395,53 +418,22 @@ class MainWindow(QMainWindow):
         
     def toggle_screen_sharing(self):
         """Active/désactive le partage d'écran local"""
+        # Toggle streaming for ADMIN only (no manual IPs)
         if self.server.is_streaming:
-            # Arrêter le streaming
             self.server.stop_streaming()
             self.share_screen_btn.setText("📤 Partager mon écran")
             self.share_screen_btn.setStyleSheet(button_solid(THEME.primary, THEME.primary_hover, padding="11px 18px"))
             self.toast.show_toast("Partage arrêté", kind="info")
             self._refresh_app_status()
         else:
-            # Demander l'IP du client
-            dialog = QDialog(self)
-            dialog.setWindowTitle("Partager l'écran")
-            layout = QVBoxLayout(dialog)
-            
-            label = QLabel("Adresse IP du client qui recevra le flux:")
-            layout.addWidget(label)
-            
-            ip_input = QLineEdit()
-            ip_input.setPlaceholderText("192.168.1.100")
-            layout.addWidget(ip_input)
-            
-            webcam_checkbox = QCheckBox("Utiliser la webcam au lieu de l'écran")
-            layout.addWidget(webcam_checkbox)
-            
-            btn_layout = QHBoxLayout()
-            cancel_btn = QPushButton("Annuler")
-            cancel_btn.clicked.connect(dialog.reject)
-            btn_layout.addWidget(cancel_btn)
-            
-            start_btn = QPushButton("Démarrer")
-            start_btn.clicked.connect(dialog.accept)
-            btn_layout.addWidget(start_btn)
-            layout.addLayout(btn_layout)
-            
-            if dialog.exec() == QDialog.Accepted:
-                client_ip = ip_input.text().strip()
-                if client_ip:
-                    self.server.use_webcam = webcam_checkbox.isChecked()
-                    self.server.add_client(client_ip)
-                    # Démarrer le serveur si pas encore lancé
-                    if not self.server.is_running:
-                        self.server.start(client_ip)
-                    # Démarrer le streaming vidéo
-                    self.server.start_streaming()
-                    self.share_screen_btn.setText("🛑 Arrêter le partage")
-                    self.share_screen_btn.setStyleSheet(button_solid(THEME.danger, THEME.danger_hover, padding="11px 18px"))
-                    self.toast.show_toast(f"Streaming démarré vers {client_ip}", kind="success")
-                    self._refresh_app_status()
+            # Start streaming to registered clients
+            if not self.server.is_running:
+                self.server.start()
+            self.server.start_streaming()
+            self.share_screen_btn.setText("🛑 Arrêter le partage")
+            self.share_screen_btn.setStyleSheet(button_solid(THEME.danger, THEME.danger_hover, padding="11px 18px"))
+            self.toast.show_toast("Streaming démarré vers clients enregistrés", kind="success")
+            self._refresh_app_status()
                     
     def show_call_dialog(self):
         """Affiche le dialog pour passer un appel"""
@@ -475,11 +467,44 @@ class MainWindow(QMainWindow):
     def _on_screen_selected(self, screen_id):
         """Callback quand un écran est sélectionné"""
         self.status_bar.showMessage(f"Écran sélectionné: {screen_id}")
+        # If admin selects a client, create a viewer connection if not already present
+        if screen_id not in self.multi_client.clients:
+            info = self.server.connected_clients.get(screen_id)
+            if not info:
+                return
+            ip = info.get('ip')
+            name = info.get('username') or ip
+            client = ScreenClient()
+            if client.connect_to_server(ip):
+                self.multi_client.clients[screen_id] = client
+                client.frame_received.connect(lambda img, sid=screen_id: self._on_screen_frame_updated(sid, img))
+                # Ensure thumbnail exists
+                if screen_id not in self.screen_list.thumbnails:
+                    self.screen_list.add_screen(screen_id, name)
+                self.toast.show_toast(f"Connecté à {name}", kind="success")
+                self._refresh_app_status()
+            else:
+                self.toast.show_toast(f"Impossible de se connecter à {ip}", kind="error")
         
     def _on_screen_frame_updated(self, screen_id, image):
         """Callback quand une frame est mise à jour"""
         # Mettre à jour la miniature
         self.screen_list.update_screen_frame(screen_id, image)
+
+    def _on_server_client_connected(self, client_id):
+        """When a client connects to the server, add it to the UI list."""
+        info = self.server.connected_clients.get(client_id)
+        if not info:
+            return
+        name = info.get('username') or info.get('ip')
+        # Ensure the UI shows the client
+        if client_id not in self.screen_list.thumbnails:
+            self.screen_list.add_screen(client_id, name)
+
+    def _on_server_client_disconnected(self, client_id):
+        """Remove client from UI when it disconnects."""
+        if client_id in self.screen_list.thumbnails:
+            self.screen_list.remove_screen(client_id)
         
     def _update_thumbnails(self):
         """Met à jour périodiquement les miniatures"""

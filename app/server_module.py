@@ -205,11 +205,10 @@ class ScreenServer(QObject):
         # Sinon, retourner le caractère tel quel (pour les lettres, chiffres, etc.)
         return key_name
             
-    def start(self, client_ip):
+    def start(self):
         """Démarre le serveur (écoute commandes seulement, pas de streaming auto)"""
-        self.client_ip = client_ip
         self.is_running = True
-        logger.info(f"Starting ScreenServer for client {client_ip}")
+        logger.info("Starting ScreenServer (command listener)")
         
         # Démarrer le thread des commandes
         self.command_thread = threading.Thread(target=self._command_listener, daemon=True)
@@ -308,15 +307,20 @@ class ScreenServer(QObject):
                     encoded, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
                     b64encoded = base64.b64encode(buffer)
 
-                    # Send to all connected clients (simple UDP broadcast)
-                    for client_id, client_addr in list(self.connected_clients.items()):
+                    # Send to all connected clients (simple UDP to each registered addr)
+                    for client_id, client_info in list(self.connected_clients.items()):
                         try:
-                            self.video_socket.sendto(b64encoded, client_addr)
+                            # client_info may be a tuple (legacy) or a dict with ip/port
+                            if isinstance(client_info, dict):
+                                addr = (client_info.get('ip'), int(client_info.get('port', VIDEO_PORT)))
+                            else:
+                                addr = client_info
+                            self.video_socket.sendto(b64encoded, addr)
                             frame_count += 1
                             if frame_count % 100 == 0:
-                                logger.info(f"Sent {frame_count} frames to {client_addr}")
+                                logger.info(f"Sent {frame_count} frames to {addr}")
                         except Exception as e:
-                            logger.debug(f"Error sending to {client_addr}: {e}")
+                            logger.debug(f"Error sending to {client_info}: {e}")
 
                     # Petit délai pour éviter surcharge (optionnel, ajustable)
                     time.sleep(0.01)
@@ -354,7 +358,8 @@ class ScreenServer(QObject):
                     self.command_socket.settimeout(1.0)
                     conn, addr = self.command_socket.accept()
                     client_id = f"{addr[0]}:{addr[1]}"
-                    self.connected_clients[client_id] = (addr[0], VIDEO_PORT)
+                    # Store client info as dict so we can keep username + port
+                    self.connected_clients[client_id] = {'ip': addr[0], 'port': VIDEO_PORT, 'username': None}
                     self.client_connected.emit(client_id)
                     logger.info(f"Accepted command connection from {addr}; registered client_id={client_id}")
                     
@@ -407,10 +412,11 @@ class ScreenServer(QObject):
                         if isinstance(command, dict) and command.get('type') == 'register':
                             try:
                                 video_port = int(command.get('video_port', VIDEO_PORT))
-                                # Update mapping so we send video UDP to the provided port
-                                self.connected_clients[client_id] = (addr[0], video_port)
-                                logger.info(f"Registered client {client_id} -> {(addr[0], video_port)}")
-                                
+                                username = command.get('username') or None
+                                # Update mapping so we send video UDP to the provided port and store username
+                                self.connected_clients[client_id] = {'ip': addr[0], 'port': video_port, 'username': username}
+                                logger.info(f"Registered client {client_id} -> {(addr[0], video_port)} (username={username})")
+
                                 # Démarrer automatiquement le streaming quand un client s'enregistre
                                 if not self.is_streaming:
                                     logger.info("Auto-starting streaming for registered client")
@@ -505,7 +511,7 @@ class ScreenServer(QObject):
     def add_client(self, client_ip):
         """Ajoute un client pour recevoir le flux vidéo"""
         client_id = f"{client_ip}:{VIDEO_PORT}"
-        self.connected_clients[client_id] = (client_ip, VIDEO_PORT)
+        self.connected_clients[client_id] = {'ip': client_ip, 'port': VIDEO_PORT, 'username': None}
         self.client_connected.emit(client_id)
         
     def remove_client(self, client_id):

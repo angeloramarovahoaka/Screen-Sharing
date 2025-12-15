@@ -13,7 +13,7 @@ from PySide6.QtCore import QObject, Signal, QThread, QTimer
 from PySide6.QtGui import QImage, QPixmap
 from pynput import keyboard, mouse
 
-from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, DEFAULT_WIDTH, DEFAULT_HEIGHT
+from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, DEFAULT_WIDTH, DEFAULT_HEIGHT, SERVER_IP, app_state
 import logging
 import os
 from logging.handlers import RotatingFileHandler, DatagramHandler
@@ -88,6 +88,9 @@ class ScreenClient(QObject):
         
     def connect_to_server(self, server_ip):
         """Se connecte à un serveur de partage d'écran"""
+        # If no server_ip provided, use the configured SERVER_IP (no user prompt)
+        if not server_ip:
+            server_ip = SERVER_IP
         self.server_ip = server_ip
         logger.info(f"[CONNECT] Attempting connection to server {server_ip}...")
         
@@ -131,8 +134,16 @@ class ScreenClient(QObject):
                         bound_port = self.video_socket.getsockname()[1]
                     except Exception:
                         bound_port = 0
+                # Include username when registering so the server can display it
+                username = None
+                try:
+                    username = app_state.current_user
+                except Exception:
+                    username = None
 
                 reg = {'type': 'register', 'video_port': int(bound_port)}
+                if username:
+                    reg['username'] = username
                 self.command_socket.sendall((json.dumps(reg) + '\n').encode('utf-8'))
                 logger.info(f"[CONNECT] Sent register to server: {reg} (server should send UDP to our port {bound_port})")
             except Exception as e:
