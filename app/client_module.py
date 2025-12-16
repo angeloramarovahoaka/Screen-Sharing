@@ -502,6 +502,9 @@ class ScreenClient(QObject):
                         except Exception as e:
                             logger.debug(f"UDP send error to {target}: {e}")
                         time.sleep(0.02)
+                    except Exception as e:
+                        logger.exception(f"Error in outbound streaming loop: {e}")
+                        time.sleep(0.1)
             except Exception as e:
                 logger.exception(f"Outbound streaming error: {e}")
             finally:
