@@ -7,7 +7,7 @@ Fonctionnalités:
 - Liste des écrans partagés
 - Zoom d'un écran spécifique
 - Manipulation d'un écran (souris, clavier)
-- Appel audio
+
 
 Usage:
     python main.py

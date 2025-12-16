@@ -29,7 +29,7 @@ try:
 except ImportError:
     from PIL import ImageGrab
 
-from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, JPEG_QUALITY, DEFAULT_WIDTH, USE_WEBCAM
+from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, JPEG_QUALITY, DEFAULT_WIDTH
 # Safe maximum UDP payload size (bytes). Keep comfortably under 65507 and typical MTU.
 MAX_UDP_PAYLOAD = 60000
 
@@ -101,7 +101,7 @@ class ScreenServer(QObject):
         self._pressed_modifiers = set()
         
         # Configuration
-        self.use_webcam = USE_WEBCAM
+        # Camera/webcam support removed — always use screen capture
         
         # Sockets
         self.video_socket = None
@@ -328,36 +328,20 @@ class ScreenServer(QObject):
             self.status_changed.emit("Streaming vidéo démarré")
             logger.info("Video streamer thread started")
             
-            if self.use_webcam:
-                # Utiliser la webcam
-                vid = cv2.VideoCapture(0)
-                if not vid.isOpened():
-                    self.error_occurred.emit("Impossible d'ouvrir la webcam")
-                    logger.error("Failed to open webcam")
-                    return
-                logger.info("Using webcam for video streaming")
-            else:
-                vid = None
-                logger.info("Using screen capture for video streaming")
+            # Use screen capture for video streaming (webcam support removed)
+            vid = None
+            logger.info("Using screen capture for video streaming")
             
             frame_count = 0
             last_log_time = time.time()
 
             while self.is_running and self.is_streaming:
                 try:
-                    # Capture frame
-                    if self.use_webcam:
-                        ret, frame = vid.read()
-                        if not ret or frame is None:
-                            logger.debug("Webcam read returned no frame; retrying")
-                            time.sleep(0.01)
-                            continue
-                        frame = imutils.resize(frame, width=DEFAULT_WIDTH)
-                    else:
-                        img_pil = ImageGrab.grab()
-                        frame = np.array(img_pil, dtype=np.uint8)
-                        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                        frame = imutils.resize(frame, width=DEFAULT_WIDTH)
+                    # Capture screen frame
+                    img_pil = ImageGrab.grab()
+                    frame = np.array(img_pil, dtype=np.uint8)
+                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    frame = imutils.resize(frame, width=DEFAULT_WIDTH)
 
                     # Encode JPEG (simple comme server-with-cam.py)
                     encode_params = [
@@ -457,8 +441,6 @@ class ScreenServer(QObject):
             self.error_occurred.emit(f"Erreur vidéo: {e}")
             logger.exception(f"Video streamer fatal error: {e}")
         finally:
-            if self.use_webcam and 'vid' in locals():
-                vid.release()
             if self.video_socket:
                 self.video_socket.close()
                 

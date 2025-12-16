@@ -6,7 +6,6 @@ import os
 # --- CONFIGURATION RÉSEAU ---
 VIDEO_PORT = 9999
 COMMAND_PORT = 9998
-AUDIO_PORT = 9997
 # Buffer UDP assez grand pour recevoir les frames (max ~65KB pour UDP)
 BUFFER_SIZE = 131072  # 128KB buffer for socket recv
 
@@ -19,13 +18,7 @@ DEFAULT_HEIGHT = int(os.getenv("SS_HEIGHT", "720"))
 # Qualité JPEG (plus haut = meilleure image, plus de bande passante)
 JPEG_QUALITY = int(os.getenv("SS_JPEG_QUALITY", "90"))
 
-# Utiliser la webcam au lieu de la capture d'écran
-USE_WEBCAM = True
-
-# --- CONFIGURATION AUDIO ---
-AUDIO_RATE = 44100
-AUDIO_CHANNELS = 1
-AUDIO_CHUNK = 1024
+# (Camera & audio features removed — application streams screen only)
 
 # --- CONFIGURATION UTILISATEUR ---
 # Simulation simple d'utilisateurs (dans une vraie app, utiliser une BDD)

@@ -15,5 +15,4 @@ Pillow>=10.0.0
 # Contrôle clavier/souris
 pynput>=1.7.6
 
-# Audio (optionnel - pour la fonctionnalité d'appel)
-PyAudio>=0.2.13
+# (Audio features removed)

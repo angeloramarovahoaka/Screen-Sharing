@@ -5,7 +5,7 @@ import os
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
     QPushButton, QLabel, QFrame, QSplitter, QMessageBox, QDialog,
-    QLineEdit, QFormLayout, QToolBar, QStatusBar, QApplication, QCheckBox
+    QLineEdit, QFormLayout, QToolBar, QStatusBar, QApplication
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont, QAction, QIcon
@@ -528,8 +528,7 @@ class MainWindow(QMainWindow):
             ip_input.setPlaceholderText("192.168.1.100")
             layout.addWidget(ip_input)
             
-            webcam_checkbox = QCheckBox("Utiliser la webcam au lieu de l'écran")
-            layout.addWidget(webcam_checkbox)
+            # NOTE: webcam option removed from UI — server uses default `USE_WEBCAM` from config
             
             btn_layout = QHBoxLayout()
             cancel_btn = QPushButton("Annuler")
@@ -544,7 +543,7 @@ class MainWindow(QMainWindow):
             if dialog.exec() == QDialog.Accepted:
                 client_ip = ip_input.text().strip()
                 if client_ip:
-                    self.server.use_webcam = webcam_checkbox.isChecked()
+                    # Use server default for webcam (config / run_server flags)
                     self.server.add_client(client_ip)
                     # Démarrer le serveur si pas encore lancé
                     if not self.server.is_running:
