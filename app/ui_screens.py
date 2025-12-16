@@ -603,6 +603,10 @@ class ScreenViewer(QWidget):
         
     def keyPressEvent(self, event: QKeyEvent):
         """Gère les appuis de touches"""
+        # DEBUG: toujours log pour tracer les events
+        key_name_debug = self._get_key_name(event)
+        print(f"[KEY-CLIENT] keyPressEvent: key={event.key()} name={key_name_debug} autoRepeat={event.isAutoRepeat()} controlling={self.is_controlling}", flush=True)
+        
         if event.isAutoRepeat():
             event.accept()
             return
@@ -627,13 +631,12 @@ class ScreenViewer(QWidget):
 
                 key_name = self._get_key_name(event)
                 if key_name:
+                    print(f"[KEY-CLIENT] Sending: mods={active_mods} key={key_name}", flush=True)
                     # If any modifiers are held, always send an atomic combo for this key.
                     # This guarantees Ctrl+C, Ctrl+V, etc. work even if the modifier was pressed earlier.
                     if active_mods:
                         self.client.send_command({'type': 'key', 'action': 'combo', 'keys': active_mods + [key_name]})
                     else:
-                        if key_name in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down', 'left', 'up', 'right', 'down']:
-                            print(f"DEBUG: Sending arrow key: {key_name}")
                         self.client.send_command({'type': 'key', 'action': 'press', 'key': key_name})
 
                     event.accept()

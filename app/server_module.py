@@ -620,29 +620,52 @@ class ScreenServer(QObject):
 
                 # Press and release main keys
                 for k in mains:
-                    # Debug for arrow keys
-                    if k in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down', 'left', 'up', 'right', 'down']:
-                        logger.debug(f"DEBUG SERVER: Processing arrow key in combo: {k}")
-                    # Try platform-optimized arrow handling first
+                    _ui_input_debug(f"combo main key: {k}")
+                    # Handle arrow keys specially
                     if k in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down']:
-                        if not self._press_arrow_key(k):
+                        if platform.system() == 'Windows':
+                            # Windows: use ctypes press then release
+                            pressed = self._press_arrow_key(k)
+                            if pressed:
+                                time.sleep(0.02)
+                                self._release_arrow_key(k)
+                                _ui_input_debug(f"Arrow {k} sent via ctypes")
+                            else:
+                                # Fallback pynput
+                                mapped = self.get_pynput_key(k)
+                                if mapped:
+                                    try:
+                                        self.keyboard.press(mapped)
+                                        time.sleep(0.02)
+                                        self.keyboard.release(mapped)
+                                        _ui_input_debug(f"Arrow {k} sent via pynput (fallback)")
+                                    except Exception as e:
+                                        logger.exception(f"Failed arrow key {k} via pynput: {e}")
+                                        _ui_input_debug(f"Arrow {k} FAILED: {e}")
+                        else:
+                            # Linux/Mac: use pynput directly
                             mapped = self.get_pynput_key(k)
                             if mapped:
                                 try:
                                     self.keyboard.press(mapped)
+                                    time.sleep(0.02)
                                     self.keyboard.release(mapped)
-                                except Exception:
-                                    logger.exception(f"Failed to send main key {k} in combo")
-                                    _ui_input_debug(f"main key combo failed {k}")
+                                    _ui_input_debug(f"Arrow {k} sent via pynput")
+                                except Exception as e:
+                                    logger.exception(f"Failed arrow key {k}: {e}")
+                                    _ui_input_debug(f"Arrow {k} FAILED: {e}")
                     else:
+                        # Normal keys
                         mapped = self.get_pynput_key(k)
                         if mapped:
                             try:
                                 self.keyboard.press(mapped)
+                                time.sleep(0.01)
                                 self.keyboard.release(mapped)
-                            except Exception:
-                                logger.exception(f"Failed to send main key {k} in combo")
-                                _ui_input_debug(f"pynput key failed {key_name} action={action}")
+                                _ui_input_debug(f"Key {k} sent via pynput")
+                            except Exception as e:
+                                logger.exception(f"Failed main key {k}: {e}")
+                                _ui_input_debug(f"Key {k} FAILED: {e}")
 
                 # Release only modifiers pressed by this combo (don't break a held modifier)
                 for m in reversed(pressed_now):
