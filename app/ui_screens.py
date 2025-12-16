@@ -413,7 +413,10 @@ class ScreenViewer(QWidget):
         self.current_image = image
         if image and not image.isNull():
             if self.fit_to_window:
-                self.zoom_level = self._fit_zoom_for_image(image)
+                new_zoom = self._fit_zoom_for_image(image)
+                # Éviter les micro-oscillations : ne recalculer que si changement > 1%
+                if abs(new_zoom - self.zoom_level) > 0.01:
+                    self.zoom_level = new_zoom
 
             # Appliquer le zoom
             new_w = max(1, int(image.width() * self.zoom_level))
@@ -426,7 +429,13 @@ class ScreenViewer(QWidget):
             pm = QPixmap.fromImage(scaled_image)
             self.screen_label.setPixmap(pm)
             self.screen_label.resize(pm.size())
-            self.screen_label.setMinimumSize(pm.size())
+            
+            # Ne pas forcer setMinimumSize en mode fit_to_window pour éviter les oscillations
+            if not self.fit_to_window:
+                self.screen_label.setMinimumSize(pm.size())
+            else:
+                # En mode fit, laisser le label s'adapter sans contrainte minimum
+                self.screen_label.setMinimumSize(QSize(1, 1))
 
             self.zoom_label.setText(f"{int(self.zoom_level * 100)}%")
 
@@ -457,14 +466,22 @@ class ScreenViewer(QWidget):
 
     def resizeEvent(self, event):
         # When fullscreen/resize happens, keep image fitted.
-        _ui_debug(
-            "ScreenViewer.resizeEvent "
-            f"viewer={self.width()}x{self.height()} "
-            f"viewport={self._viewport_size().width()}x{self._viewport_size().height()} "
-            f"fit={self.fit_to_window}"
-        )
-        if self.fit_to_window and self.current_image and not self.current_image.isNull():
-            self.update_frame(self.current_image)
+        # Utiliser un flag pour éviter les appels récursifs
+        if getattr(self, '_in_resize', False):
+            return super().resizeEvent(event)
+            
+        self._in_resize = True
+        try:
+            _ui_debug(
+                "ScreenViewer.resizeEvent "
+                f"viewer={self.width()}x{self.height()} "
+                f"viewport={self._viewport_size().width()}x{self._viewport_size().height()} "
+                f"fit={self.fit_to_window}"
+            )
+            if self.fit_to_window and self.current_image and not self.current_image.isNull():
+                self.update_frame(self.current_image)
+        finally:
+            self._in_resize = False
         return super().resizeEvent(event)
             
     def toggle_fullscreen(self):
