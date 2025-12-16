@@ -14,6 +14,41 @@ from PySide6.QtGui import QImage, QPixmap
 from pynput import keyboard, mouse
 
 from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, DEFAULT_WIDTH, DEFAULT_HEIGHT
+import logging
+import os
+from logging.handlers import RotatingFileHandler, DatagramHandler
+
+# --- Logging configuration ---
+LOG_LEVEL = os.getenv("SS_LOG_LEVEL", "INFO").upper()
+logger = logging.getLogger("screenshare.client")
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    # File Rotating handler
+    try:
+        logs_dir = os.path.join(os.getcwd(), "logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        file_path = os.path.join(logs_dir, "client.log")
+        fh = RotatingFileHandler(file_path, maxBytes=5 * 1024 * 1024, backupCount=5, encoding='utf-8')
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+    except Exception:
+        pass
+
+    # Optional remote log collector via UDP: set SS_LOG_COLLECTOR=host:port
+    collector = os.getenv("SS_LOG_COLLECTOR")
+    if collector:
+        try:
+            host, port = collector.split(":")
+            dh = DatagramHandler(host, int(port))
+            logger.addHandler(dh)
+        except Exception:
+            pass
+
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
 
 class ScreenClient(QObject):
@@ -23,6 +58,7 @@ class ScreenClient(QObject):
     """
     frame_received = Signal(QImage)
     status_changed = Signal(str)
+    stream_state_changed = Signal(str)  # 'started' | 'stopped'
     connected = Signal()
     disconnected = Signal()
     error_occurred = Signal(str)
@@ -46,6 +82,7 @@ class ScreenClient(QObject):
         
         # Thread de réception
         self.receive_thread = None
+        self.control_thread = None
         
         # Listeners clavier/souris (optionnels, pour capture globale)
         self.keyboard_listener = None
@@ -54,6 +91,7 @@ class ScreenClient(QObject):
     def connect_to_server(self, server_ip):
         """Se connecte à un serveur de partage d'écran"""
         self.server_ip = server_ip
+        logger.info(f"[CONNECT] Attempting connection to server {server_ip}...")
         
         try:
             # Socket vidéo UDP
@@ -61,41 +99,63 @@ class ScreenClient(QObject):
             self.video_socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, BUFFER_SIZE)
             self.video_socket.settimeout(0.1)
             
-                try:
-                    # Bind to ephemeral port so multiple clients on same machine don't conflict
-                    self.video_socket.bind(('0.0.0.0', 0))
-                    local_port = self.video_socket.getsockname()[1]
-                    logger.info(f"Bound video socket to 0.0.0.0:{local_port} (ephemeral)")
-                except Exception as e:
-                    logger.exception(f"Could not bind video socket: {e}")
-                    # continue; socket may still work for sends
+            # Bind explicitly to an ephemeral UDP port (0) so multiple viewers don't conflict.
+            try:
+                self.video_socket.bind(('0.0.0.0', 0))
+                bound_addr = self.video_socket.getsockname()
+                logger.info(f"[CONNECT] UDP video socket bound to {bound_addr}")
+            except Exception:
+                # If bind fails, continue; we'll still attempt to use the socket.
+                logger.exception("Failed to bind video socket to ephemeral port")
                 
             # Socket commandes TCP
+            logger.info(f"[CONNECT] Connecting TCP command socket to {server_ip}:{COMMAND_PORT}...")
             self.command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # Désactiver Nagle pour réduire la latence des inputs
+            self.command_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             self.command_socket.settimeout(5.0)
             self.command_socket.connect((server_ip, COMMAND_PORT))
+            logger.info(f"[CONNECT] TCP connected! Local addr: {self.command_socket.getsockname()}")
             
             self.is_connected = True
             self.is_running = True
             
-            # Démarrer le thread de réception
+            # Démarrer le thread de réception (doit être lancé avant d'attendre des paquets)
             self.receive_thread = threading.Thread(target=self._receive_video, daemon=True)
             self.receive_thread.start()
-            
-                # Inform the server which UDP port we listen on for video
-                try:
-                    reg = {'type': 'register', 'video_port': self.video_socket.getsockname()[1]}
-                    self.command_socket.sendall((json.dumps(reg) + '\n').encode('utf-8'))
-                    logger.info(f"Sent register to server: {reg}")
-                except Exception as e:
-                    logger.exception(f"Failed to send register to server: {e}")
-                # Also send START to signal readiness (server may ignore if using register)
-                try:
-                    self.video_socket.sendto(b'START', (server_ip, VIDEO_PORT))
-                    logger.debug(f"Sent START to {(server_ip, VIDEO_PORT)}")
-                except Exception:
-                    logger.debug("Failed to send START (non-fatal)")
-            
+
+            # Start control receiver (server -> client notifications) over the same TCP socket
+            try:
+                self.command_socket.settimeout(0.5)
+            except Exception:
+                pass
+            self.control_thread = threading.Thread(target=self._receive_control, daemon=True)
+            self.control_thread.start()
+
+            # Inform the server which UDP port we listen on for video (register)
+            try:
+                bound_port = self.video_socket.getsockname()[1]
+                # If socket was not bound, getsockname may return 0; guard against that.
+                if not bound_port:
+                    # Try to bind explicitly to ephemeral port
+                    try:
+                        self.video_socket.bind(('0.0.0.0', 0))
+                        bound_port = self.video_socket.getsockname()[1]
+                    except Exception:
+                        bound_port = 0
+
+                reg = {'type': 'register', 'video_port': int(bound_port)}
+                self.command_socket.sendall((json.dumps(reg) + '\n').encode('utf-8'))
+                logger.info(f"[CONNECT] Sent register to server: {reg} (server should send UDP to our port {bound_port})")
+            except Exception as e:
+                logger.exception(f"Failed to send register to server: {e}")
+            # Also send START to signal readiness (server may ignore if using register)
+            try:
+                self.video_socket.sendto(b'START', (server_ip, VIDEO_PORT))
+                logger.debug(f"Sent START to {(server_ip, VIDEO_PORT)}")
+            except Exception:
+                logger.debug("Failed to send START (non-fatal)")
+        
             self.status_changed.emit(f"Connecté à {server_ip}")
             self.connected.emit()
             
@@ -144,30 +204,97 @@ class ScreenClient(QObject):
         self.latest_frame = None
         self.status_changed.emit("Déconnecté")
         self.disconnected.emit()
+
+    def _receive_control(self):
+        """Thread de réception des messages de contrôle via TCP (JSON lines)."""
+        buf = b""
+        while self.is_running and self.is_connected and self.command_socket:
+            try:
+                chunk = self.command_socket.recv(4096)
+                if not chunk:
+                    break
+                buf += chunk
+                while b"\n" in buf:
+                    line, buf = buf.split(b"\n", 1)
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        msg = json.loads(line.decode("utf-8", errors="replace"))
+                    except Exception:
+                        continue
+
+                    if isinstance(msg, dict) and msg.get("type") == "stream":
+                        state = str(msg.get("state", "")).strip().lower()
+                        if state in {"started", "stopped"}:
+                            self.stream_state_changed.emit(state)
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            except Exception as e:
+                logger.debug(f"[CTRL-RX] Error: {e}")
+                break
+
+        # If we exit unexpectedly while still marked connected, trigger disconnect
+        if self.is_running and self.is_connected:
+            try:
+                self.disconnect()
+            except Exception:
+                pass
         
     def _receive_video(self):
-        """Thread de réception du flux vidéo"""
+        """Thread de réception du flux vidéo (simple comme client-with-cam.py)"""
+        frame_count = 0
+        timeout_count = 0
+        bound_addr = self.video_socket.getsockname() if self.video_socket else None
+        logger.info(f"[VIDEO-RX] Starting receive thread, listening on {bound_addr}, server_ip={self.server_ip}")
+        
         while self.is_running:
             try:
+                # Recevoir paquet UDP (base64 direct)
                 packet, addr = self.video_socket.recvfrom(BUFFER_SIZE)
-                data = base64.b64decode(packet)
-                npdata = np.frombuffer(data, dtype=np.uint8)
-                frame = cv2.imdecode(npdata, cv2.IMREAD_COLOR)
+                timeout_count = 0  # Reset sur réception réussie
                 
-                if frame is not None:
-                    self.latest_frame = frame
+                # Décoder directement (JPEG bytes), fallback base64 pour compatibilité
+                try:
+                    npdata = np.frombuffer(packet, dtype=np.uint8)
+                    frame = cv2.imdecode(npdata, cv2.IMREAD_COLOR)
+
+                    if frame is None:
+                        data = base64.b64decode(packet)
+                        npdata = np.frombuffer(data, dtype=np.uint8)
+                        frame = cv2.imdecode(npdata, cv2.IMREAD_COLOR)
                     
-                    # Convertir en QImage et émettre le signal
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    h, w, ch = frame_rgb.shape
-                    bytes_per_line = ch * w
-                    qimg = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
-                    self.frame_received.emit(qimg.copy())
+                    if frame is not None:
+                        frame_count += 1
+                        self.latest_frame = frame
+                        
+                        # Log périodique
+                        if frame_count % 100 == 0:
+                            logger.info(f"[VIDEO-RX] Received {frame_count} frames from {addr}")
+                        
+                        # Convertir en QImage et émettre
+                        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        h, w, ch = frame_rgb.shape
+                        bytes_per_line = ch * w
+                        qimg = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
+                        self.frame_received.emit(qimg.copy())
+                    else:
+                        logger.debug(f"[VIDEO-RX] Failed to decode frame")
+                        
+                except Exception as e:
+                    logger.debug(f"[VIDEO-RX] Error decoding packet: {e}")
                     
             except socket.timeout:
+                timeout_count += 1
+                # Log timeout seulement toutes les 5 secondes
+                if timeout_count % 50 == 1:
+                    logger.debug(f"[VIDEO-RX] Waiting for video... (frames_received={frame_count})")
                 continue
             except Exception as e:
                 if self.is_running:
+                    logger.error(f"[VIDEO-RX] Error in receive loop: {e}")
                     time.sleep(0.001)
                     
     def send_command(self, command_dict):
@@ -177,9 +304,13 @@ class ScreenClient(QObject):
             
         try:
             message = json.dumps(command_dict) + '\n'
+            if os.getenv("SS_INPUT_DEBUG", "0") == "1":
+                logger.info(f"[INPUT-CLIENT] send_command: {command_dict}")
             self.command_socket.sendall(message.encode('utf-8'))
             return True
         except Exception as e:
+            if os.getenv("SS_INPUT_DEBUG", "0") == "1":
+                logger.exception(f"[INPUT-CLIENT] send_command failed: {e}")
             return False
             
     def send_mouse_move(self, x, y, widget_width, widget_height):

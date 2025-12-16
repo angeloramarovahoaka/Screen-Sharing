@@ -6,18 +6,19 @@ import os
 # --- CONFIGURATION RÉSEAU ---
 VIDEO_PORT = 9999
 COMMAND_PORT = 9998
-AUDIO_PORT = 9997
-BUFFER_SIZE = 65536
+# Buffer UDP assez grand pour recevoir les frames (max ~65KB pour UDP)
+BUFFER_SIZE = 131072  # 128KB buffer for socket recv
 
 # --- CONFIGURATION VIDÉO ---
-DEFAULT_WIDTH = 640
-DEFAULT_HEIGHT = 360
-JPEG_QUALITY = 70
+# Résolution réduite pour garder les paquets UDP sous ~60KB
+# Increase default capture width for better image quality (can be overridden with SS_WIDTH)
+DEFAULT_WIDTH = int(os.getenv("SS_WIDTH", "1280"))
+# DEFAULT_HEIGHT is kept for backward compatibility, but we'll compute height dynamically when needed
+DEFAULT_HEIGHT = int(os.getenv("SS_HEIGHT", "720"))
+# Qualité JPEG (plus haut = meilleure image, plus de bande passante)
+JPEG_QUALITY = int(os.getenv("SS_JPEG_QUALITY", "90"))
 
-# --- CONFIGURATION AUDIO ---
-AUDIO_RATE = 44100
-AUDIO_CHANNELS = 1
-AUDIO_CHUNK = 1024
+# (Camera & audio features removed — application streams screen only)
 
 # --- CONFIGURATION UTILISATEUR ---
 # Simulation simple d'utilisateurs (dans une vraie app, utiliser une BDD)

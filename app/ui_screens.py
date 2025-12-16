@@ -1,17 +1,76 @@
 """
 Widgets pour l'affichage et la manipulation des écrans partagés
 """
+import os
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QFrame, QSizePolicy, QMenu, QToolButton, QSlider, QGridLayout
+    QFrame, QSizePolicy, QMenu, QToolButton, QSlider, QGridLayout, QGraphicsDropShadowEffect
 )
 from PySide6.QtCore import Signal, Qt, QSize, QPoint, QTimer
 from PySide6.QtGui import (
     QImage, QPixmap, QPainter, QFont, QMouseEvent, 
-    QKeyEvent, QWheelEvent, QCursor
+    QKeyEvent, QWheelEvent, QCursor, QColor, QLinearGradient
 )
-
+from PySide6.QtCore import QEvent
 from .client_module import ScreenClient
+
+
+def _ui_debug(msg: str):
+    if os.getenv("SS_UI_DEBUG", "0") == "1":
+        print(f"[UI_DEBUG] {msg}", flush=True)
+
+
+class SkeletonPreview(QLabel):
+    """Preview area with an animated skeleton shimmer until a pixmap is set."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._phase = 0.0
+        self._timer = QTimer(self)
+        self._timer.setInterval(33)  # ~30fps
+        self._timer.timeout.connect(self._tick)
+        self._timer.start()
+
+        self.setAlignment(Qt.AlignCenter)
+        self.setMinimumSize(190, 100)
+        self.setText("📺 En attente…")
+
+    def _tick(self):
+        # Only animate when we don't have a real pixmap.
+        pm = self.pixmap()
+        if pm is not None and not pm.isNull():
+            return
+        self._phase = (self._phase + 0.035) % 1.0
+        self.update()
+
+    def paintEvent(self, event):
+        pm = self.pixmap()
+        if pm is not None and not pm.isNull():
+            return super().paintEvent(event)
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        r = self.rect()
+
+        # Background
+        painter.fillRect(r, QColor("#1a1a1a"))
+
+        # Shimmer
+        w = max(1, r.width())
+        offset = int((self._phase * (w + 120)) - 120)
+        grad = QLinearGradient(offset, 0, offset + 120, 0)
+        grad.setColorAt(0.0, QColor(255, 255, 255, 0))
+        grad.setColorAt(0.5, QColor(255, 255, 255, 26))
+        grad.setColorAt(1.0, QColor(255, 255, 255, 0))
+        painter.fillRect(r, grad)
+
+        # Text hint
+        painter.setPen(QColor("#666"))
+        painter.setFont(QFont("Segoe UI", 9))
+        painter.drawText(r, Qt.AlignCenter, self.text())
+
+        painter.end()
 
 
 class ScreenThumbnail(QFrame):
@@ -28,6 +87,14 @@ class ScreenThumbnail(QFrame):
         self.screen_name = screen_name
         self.is_selected = False
         self.current_image = None
+        self._hovered = False
+        self._shadow = QGraphicsDropShadowEffect(self)
+        self._shadow.setBlurRadius(18)
+        self._shadow.setOffset(0, 6)
+        self._shadow.setColor(QColor(0, 0, 0, 60))
+        # Keep the effect attached; toggle via setEnabled() to avoid Qt deleting it.
+        self.setGraphicsEffect(self._shadow)
+        self._shadow.setEnabled(False)
         
         self.setFixedSize(200, 140)
         self.setFrameShape(QFrame.StyledPanel)
@@ -41,19 +108,11 @@ class ScreenThumbnail(QFrame):
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(5)
         
-        # Zone d'affichage de l'écran
-        self.screen_label = QLabel()
-        self.screen_label.setAlignment(Qt.AlignCenter)
-        self.screen_label.setMinimumSize(190, 100)
-        self.screen_label.setStyleSheet("background-color: #1a1a1a; border-radius: 3px;")
-        self.screen_label.setText("📺 En attente...")
-        self.screen_label.setStyleSheet("""
-            QLabel {
-                background-color: #1a1a1a;
-                color: #666;
-                border-radius: 3px;
-            }
-        """)
+        # Zone d'affichage de l'écran (skeleton animé tant qu'aucune frame)
+        self.screen_label = SkeletonPreview()
+        self.screen_label.setStyleSheet(
+            "QLabel { border-radius: 6px; }"
+        )
         layout.addWidget(self.screen_label)
         
         # Barre d'info
@@ -67,6 +126,8 @@ class ScreenThumbnail(QFrame):
         # Nom de l'écran
         self.name_label = QLabel(self.screen_name)
         self.name_label.setFont(QFont("Segoe UI", 9))
+        # Ensure high contrast on any background (dark text)
+        self.name_label.setStyleSheet("color: #111111;")
         info_layout.addWidget(self.name_label)
         
         info_layout.addStretch()
@@ -75,20 +136,43 @@ class ScreenThumbnail(QFrame):
         self.menu_button = QToolButton()
         self.menu_button.setText("⋮")
         self.menu_button.setPopupMode(QToolButton.InstantPopup)
+        # Improve contrast: darker text, subtle hover background
         self.menu_button.setStyleSheet("""
             QToolButton {
                 border: none;
-                padding: 2px 5px;
+                padding: 2px 6px;
+                color: #111111;
+                background: transparent;
+                font-weight: 600;
             }
             QToolButton:hover {
-                background-color: rgba(0,0,0,0.1);
+                background-color: rgba(0,0,0,0.04);
                 border-radius: 3px;
+            }
+            QToolButton:pressed {
+                background-color: rgba(0,0,0,0.06);
             }
         """)
         
         menu = QMenu(self.menu_button)
         menu.addAction("🔍 Zoom", lambda: self.double_clicked.emit(self.screen_id))
         menu.addAction("❌ Déconnecter", lambda: self.remove_requested.emit(self.screen_id))
+        # Menu style for better visibility on grey backgrounds
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: white;
+                color: #111111;
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                padding: 4px;
+            }
+            QMenu::item {
+                padding: 6px 12px;
+            }
+            QMenu::item:selected {
+                background-color: #f0f0f0;
+            }
+        """)
         self.menu_button.setMenu(menu)
         info_layout.addWidget(self.menu_button)
         
@@ -115,6 +199,9 @@ class ScreenThumbnail(QFrame):
                     border-color: #2196F3;
                 }
             """)
+
+        # Hover affordance via shadow (don't detach the effect: Qt may delete it)
+        self._shadow.setEnabled(self._hovered and not self.is_selected)
             
     def update_frame(self, image: QImage):
         """Met à jour l'image affichée"""
@@ -127,6 +214,7 @@ class ScreenThumbnail(QFrame):
                 Qt.SmoothTransformation
             )
             self.screen_label.setPixmap(scaled)
+            self.screen_label.setText("")
             
     def set_selected(self, selected):
         """Définit l'état de sélection"""
@@ -149,6 +237,16 @@ class ScreenThumbnail(QFrame):
             self.double_clicked.emit(self.screen_id)
         super().mouseDoubleClickEvent(event)
 
+    def enterEvent(self, event):
+        self._hovered = True
+        self.update_style()
+        return super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self.update_style()
+        return super().leaveEvent(event)
+
 
 class ScreenViewer(QWidget):
     """
@@ -162,11 +260,24 @@ class ScreenViewer(QWidget):
         self.client = client
         self.current_image = None
         self.zoom_level = 1.0
+        self.fit_to_window = True
         self.is_controlling = True
+        
+        # Tracker l'état des touches modificatrices pour éviter de les envoyer plusieurs fois
+        self.pressed_modifiers = set()
         
         self.setFocusPolicy(Qt.StrongFocus)
         self.setMouseTracking(True)
         self.setup_ui()
+
+        # Ensure the viewer receives keyboard focus so key events go to it
+        try:
+            self.setFocus(Qt.OtherFocusReason)
+        except Exception:
+            try:
+                self.setFocus()
+            except Exception:
+                pass
         
     def setup_ui(self):
         """Configure l'interface"""
@@ -253,7 +364,9 @@ class ScreenViewer(QWidget):
         
         # Zone d'affichage de l'écran
         self.screen_area = QScrollArea()
-        self.screen_area.setWidgetResizable(True)
+        # Keep label size driving scrollbars; we'll scale pixmap ourselves.
+        self.screen_area.setWidgetResizable(False)
+        self.screen_area.setAlignment(Qt.AlignCenter)
         self.screen_area.setStyleSheet("""
             QScrollArea {
                 background-color: #1a1a1a;
@@ -266,25 +379,78 @@ class ScreenViewer(QWidget):
         self.screen_label.setMouseTracking(True)
         self.screen_label.setStyleSheet("background-color: #1a1a1a;")
         self.screen_area.setWidget(self.screen_label)
+
+        # Forward key events from viewport/label to the viewer
+        self.screen_area.setFocusPolicy(Qt.NoFocus)
+        self.screen_label.setFocusPolicy(Qt.NoFocus)
+        self.screen_area.viewport().setFocusPolicy(Qt.NoFocus)
+        self.screen_area.viewport().installEventFilter(self)
+        self.screen_label.installEventFilter(self)
+
+        # Ensure viewer itself can take focus
+        self.setFocusPolicy(Qt.StrongFocus)
         
         layout.addWidget(self.screen_area)
+
+    def _viewport_size(self) -> QSize:
+        try:
+            return self.screen_area.viewport().size()
+        except Exception:
+            return QSize(0, 0)
+
+    def _fit_zoom_for_image(self, image: QImage) -> float:
+        vp = self._viewport_size()
+        if vp.width() <= 0 or vp.height() <= 0:
+            return 1.0
+        if image.width() <= 0 or image.height() <= 0:
+            return 1.0
+        scale = min(vp.width() / image.width(), vp.height() / image.height())
+        # Clamp to reasonable bounds.
+        return max(0.1, min(3.0, float(scale)))
         
     def update_frame(self, image: QImage):
         """Met à jour l'image affichée"""
         self.current_image = image
         if image and not image.isNull():
+            if self.fit_to_window:
+                new_zoom = self._fit_zoom_for_image(image)
+                # Éviter les micro-oscillations : ne recalculer que si changement > 1%
+                if abs(new_zoom - self.zoom_level) > 0.01:
+                    self.zoom_level = new_zoom
+
             # Appliquer le zoom
-            new_size = image.size() * self.zoom_level
+            new_w = max(1, int(image.width() * self.zoom_level))
+            new_h = max(1, int(image.height() * self.zoom_level))
             scaled_image = image.scaled(
-                new_size,
+                QSize(new_w, new_h),
                 Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
+                Qt.SmoothTransformation,
             )
-            self.screen_label.setPixmap(QPixmap.fromImage(scaled_image))
-            self.screen_label.setFixedSize(scaled_image.size())
+            pm = QPixmap.fromImage(scaled_image)
+            self.screen_label.setPixmap(pm)
+            self.screen_label.resize(pm.size())
+            
+            # Ne pas forcer setMinimumSize en mode fit_to_window pour éviter les oscillations
+            if not self.fit_to_window:
+                self.screen_label.setMinimumSize(pm.size())
+            else:
+                # En mode fit, laisser le label s'adapter sans contrainte minimum
+                self.screen_label.setMinimumSize(QSize(1, 1))
+
+            self.zoom_label.setText(f"{int(self.zoom_level * 100)}%")
+
+            _ui_debug(
+                "ScreenViewer.update_frame "
+                f"img={image.width()}x{image.height()} "
+                f"viewport={self._viewport_size().width()}x{self._viewport_size().height()} "
+                f"zoom={self.zoom_level:.3f} "
+                f"pixmap={pm.width()}x{pm.height()} "
+                f"label={self.screen_label.width()}x{self.screen_label.height()}"
+            )
             
     def zoom_in(self):
         """Augmente le zoom"""
+        self.fit_to_window = False
         self.zoom_level = min(3.0, self.zoom_level + 0.25)
         self.zoom_label.setText(f"{int(self.zoom_level * 100)}%")
         if self.current_image:
@@ -292,10 +458,31 @@ class ScreenViewer(QWidget):
             
     def zoom_out(self):
         """Diminue le zoom"""
+        self.fit_to_window = False
         self.zoom_level = max(0.25, self.zoom_level - 0.25)
         self.zoom_label.setText(f"{int(self.zoom_level * 100)}%")
         if self.current_image:
             self.update_frame(self.current_image)
+
+    def resizeEvent(self, event):
+        # When fullscreen/resize happens, keep image fitted.
+        # Utiliser un flag pour éviter les appels récursifs
+        if getattr(self, '_in_resize', False):
+            return super().resizeEvent(event)
+            
+        self._in_resize = True
+        try:
+            _ui_debug(
+                "ScreenViewer.resizeEvent "
+                f"viewer={self.width()}x{self.height()} "
+                f"viewport={self._viewport_size().width()}x{self._viewport_size().height()} "
+                f"fit={self.fit_to_window}"
+            )
+            if self.fit_to_window and self.current_image and not self.current_image.isNull():
+                self.update_frame(self.current_image)
+        finally:
+            self._in_resize = False
+        return super().resizeEvent(event)
             
     def toggle_fullscreen(self):
         """Bascule le mode plein écran"""
@@ -327,6 +514,22 @@ class ScreenViewer(QWidget):
                     padding: 5px 10px;
                 }
             """)
+            # Relâcher tous les modificateurs quand on désactive le contrôle
+            self._release_all_modifiers()
+    
+    def _release_all_modifiers(self):
+        """Relâche toutes les touches modificatrices pressées"""
+        if not self.client:
+            return
+            
+        for modifier in list(self.pressed_modifiers):
+            self.client.send_command({'type': 'key', 'action': 'release', 'key': modifier})
+        self.pressed_modifiers.clear()
+    
+    def focusOutEvent(self, event):
+        """Appelé quand la fenêtre perd le focus - relâcher les modificateurs"""
+        self._release_all_modifiers()
+        super().focusOutEvent(event)
             
     def _get_normalized_position(self, pos):
         """Convertit la position en coordonnées normalisées"""
@@ -414,22 +617,105 @@ class ScreenViewer(QWidget):
                 'dy': dy
             })
         super().wheelEvent(event)
+
+    def event(self, event):
+        """Intercepte les événements avant le traitement standard de Qt.
+        Nécessaire pour capturer Tab, F1-F12, Escape et les combinaisons (Ctrl+C, etc.)
+        que Qt pourrait utiliser pour ses propres raccourcis.
+        """
+        from PySide6.QtCore import QEvent
+        if event.type() == QEvent.Type.KeyPress:
+            if self.is_controlling and self.client:
+                key = event.key()
+                modifiers = event.modifiers()
+                
+                # Intercepter TOUTES les touches avec modificateurs (Ctrl+X, Alt+X, etc.)
+                # pour éviter que Qt ne les consomme pour ses propres raccourcis
+                has_modifiers = modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)
+                
+                # Liste des touches à toujours intercepter (même sans modificateur)
+                special_keys = (Qt.Key_Tab, Qt.Key_Backtab, 
+                               Qt.Key_F1, Qt.Key_F2, Qt.Key_F3, Qt.Key_F4, Qt.Key_F5, Qt.Key_F6,
+                               Qt.Key_F7, Qt.Key_F8, Qt.Key_F9, Qt.Key_F10, Qt.Key_F11, Qt.Key_F12,
+                               Qt.Key_Escape, Qt.Key_Return, Qt.Key_Enter, Qt.Key_Backspace,
+                               Qt.Key_Delete, Qt.Key_Home, Qt.Key_End, Qt.Key_PageUp, Qt.Key_PageDown,
+                               Qt.Key_Left, Qt.Key_Right, Qt.Key_Up, Qt.Key_Down)
+                
+                if has_modifiers or key in special_keys:
+                    self.keyPressEvent(event)
+                    return True  # Event handled, don't let Qt use it
+                    
+        elif event.type() == QEvent.Type.KeyRelease:
+            if self.is_controlling and self.client:
+                key = event.key()
+                modifiers = event.modifiers()
+                
+                has_modifiers = modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)
+                special_keys = (Qt.Key_Tab, Qt.Key_Backtab,
+                               Qt.Key_F1, Qt.Key_F2, Qt.Key_F3, Qt.Key_F4, Qt.Key_F5, Qt.Key_F6,
+                               Qt.Key_F7, Qt.Key_F8, Qt.Key_F9, Qt.Key_F10, Qt.Key_F11, Qt.Key_F12,
+                               Qt.Key_Escape, Qt.Key_Return, Qt.Key_Enter, Qt.Key_Backspace,
+                               Qt.Key_Delete, Qt.Key_Home, Qt.Key_End, Qt.Key_PageUp, Qt.Key_PageDown,
+                               Qt.Key_Left, Qt.Key_Right, Qt.Key_Up, Qt.Key_Down)
+                
+                if has_modifiers or key in special_keys:
+                    self.keyReleaseEvent(event)
+                    return True
+                    
+        return super().event(event)
         
     def keyPressEvent(self, event: QKeyEvent):
         """Gère les appuis de touches"""
+        # DEBUG: toujours log pour tracer les events
+        key_name_debug = self._get_key_name(event)
+        print(f"[KEY-CLIENT] keyPressEvent: key={event.key()} name={key_name_debug} autoRepeat={event.isAutoRepeat()} controlling={self.is_controlling}", flush=True)
+        
+        if event.isAutoRepeat():
+            event.accept()
+            return
         if self.is_controlling and self.client:
-            key_name = self._get_key_name(event)
-            if key_name:
-                self.client.send_command({
-                    'type': 'key',
-                    'action': 'press',
-                    'key': key_name
-                })
+            modifiers = event.modifiers()
+            key = event.key()
+            
+            # Vérifier si c'est une touche modificatrice elle-même
+            is_modifier_key = key in [Qt.Key_Control, Qt.Key_Shift, Qt.Key_Alt, Qt.Key_Meta, 
+                                      Qt.Key_Super_L, Qt.Key_Super_R]
+            if not is_modifier_key:
+                # Determine active modifier names from the event
+                active_mods = []
+                if (modifiers & Qt.ControlModifier):
+                    active_mods.append('ctrl')
+                if (modifiers & Qt.ShiftModifier):
+                    active_mods.append('shift')
+                if (modifiers & Qt.AltModifier):
+                    active_mods.append('alt')
+                if (modifiers & Qt.MetaModifier):
+                    active_mods.append('cmd')
+
+                key_name = self._get_key_name(event)
+                if key_name:
+                    print(f"[KEY-CLIENT] Sending: mods={active_mods} key={key_name}", flush=True)
+                    # If any modifiers are held, always send an atomic combo for this key.
+                    # This guarantees Ctrl+C, Ctrl+V, etc. work even if the modifier was pressed earlier.
+                    if active_mods:
+                        self.client.send_command({'type': 'key', 'action': 'combo', 'keys': active_mods + [key_name]})
+                    else:
+                        self.client.send_command({'type': 'key', 'action': 'press', 'key': key_name})
+
+                    event.accept()
+                    return
+                
         super().keyPressEvent(event)
         
     def keyReleaseEvent(self, event: QKeyEvent):
         """Gère les relâchements de touches"""
+        if event.isAutoRepeat():
+            event.accept()
+            return
         if self.is_controlling and self.client:
+            key = event.key()
+            
+            # Envoyer le relâchement de la touche principale
             key_name = self._get_key_name(event)
             if key_name:
                 self.client.send_command({
@@ -437,7 +723,40 @@ class ScreenViewer(QWidget):
                     'action': 'release',
                     'key': key_name
                 })
+            
+            # Si c'est une touche modificatrice qui est relâchée, la retirer du tracker
+            if key == Qt.Key_Control and 'ctrl' in self.pressed_modifiers:
+                self.client.send_command({'type': 'key', 'action': 'release', 'key': 'ctrl'})
+                self.pressed_modifiers.discard('ctrl')
+                
+            elif key == Qt.Key_Shift and 'shift' in self.pressed_modifiers:
+                self.client.send_command({'type': 'key', 'action': 'release', 'key': 'shift'})
+                self.pressed_modifiers.discard('shift')
+                
+            elif key == Qt.Key_Alt and 'alt' in self.pressed_modifiers:
+                self.client.send_command({'type': 'key', 'action': 'release', 'key': 'alt'})
+                self.pressed_modifiers.discard('alt')
+                
+            elif key in [Qt.Key_Meta, Qt.Key_Super_L, Qt.Key_Super_R] and 'cmd' in self.pressed_modifiers:
+                self.client.send_command({'type': 'key', 'action': 'release', 'key': 'cmd'})
+                self.pressed_modifiers.discard('cmd')
+
+            event.accept()
+            return
+                
         super().keyReleaseEvent(event)
+
+    def eventFilter(self, obj, event):
+        # Forward key events from child widgets to our handlers
+        
+        if event.type() in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease):
+            if obj in (self.screen_area.viewport(), self.screen_label):
+                if event.type() == QEvent.Type.KeyPress:
+                    self.keyPressEvent(event)
+                else:
+                    self.keyReleaseEvent(event)
+                return True
+        return super().eventFilter(obj, event)
         
     def _get_key_name(self, event: QKeyEvent):
         """Convertit un événement clavier en nom de touche"""
@@ -455,16 +774,22 @@ class ScreenViewer(QWidget):
             Qt.Key_Delete: 'delete',
             Qt.Key_Home: 'home',
             Qt.Key_End: 'end',
-            Qt.Key_Left: 'left',
-            Qt.Key_Right: 'right',
-            Qt.Key_Up: 'up',
-            Qt.Key_Down: 'down',
+            Qt.Key_Left: 'arrow_left',
+            Qt.Key_Right: 'arrow_right',
+            Qt.Key_Up: 'arrow_up',
+            Qt.Key_Down: 'arrow_down',
             Qt.Key_PageUp: 'page_up',
             Qt.Key_PageDown: 'page_down',
             Qt.Key_Shift: 'shift',
             Qt.Key_Control: 'ctrl',
             Qt.Key_Alt: 'alt',
+            Qt.Key_Meta: 'cmd',  # Touche Windows/Command
+            Qt.Key_Super_L: 'cmd',  # Windows gauche
+            Qt.Key_Super_R: 'cmd_r',  # Windows droit
             Qt.Key_CapsLock: 'caps_lock',
+            Qt.Key_Insert: 'insert',
+            Qt.Key_Pause: 'pause',
+            Qt.Key_Print: 'print_screen',
             Qt.Key_F1: 'f1',
             Qt.Key_F2: 'f2',
             Qt.Key_F3: 'f3',
@@ -481,8 +806,38 @@ class ScreenViewer(QWidget):
         
         if key in special_keys:
             return special_keys[key]
-        elif text and text.isprintable():
-            return text
+        
+        # Si text est disponible et imprimable, l'utiliser
+        if text and text.isprintable():
+            return text.lower()
+        
+        # Fallback: convertir le code de touche en caractère
+        # Quand Ctrl/Alt est pressé, event.text() est souvent vide
+        # Qt.Key_A = 65, Qt.Key_Z = 90 (lettres majuscules)
+        # Qt.Key_0 = 48, Qt.Key_9 = 57 (chiffres)
+        if Qt.Key_A <= key <= Qt.Key_Z:
+            return chr(key).lower()  # 65 -> 'a', 66 -> 'b', etc.
+        elif Qt.Key_0 <= key <= Qt.Key_9:
+            return chr(key)  # 48 -> '0', 49 -> '1', etc.
+        
+        # Touches spéciales du pavé numérique et autres caractères
+        numpad_keys = {
+            Qt.Key_Minus: '-',
+            Qt.Key_Plus: '+',
+            Qt.Key_Equal: '=',
+            Qt.Key_BracketLeft: '[',
+            Qt.Key_BracketRight: ']',
+            Qt.Key_Backslash: '\\',
+            Qt.Key_Semicolon: ';',
+            Qt.Key_Apostrophe: "'",
+            Qt.Key_Comma: ',',
+            Qt.Key_Period: '.',
+            Qt.Key_Slash: '/',
+            Qt.Key_QuoteLeft: '`',
+        }
+        if key in numpad_keys:
+            return numpad_keys[key]
+            
         return None
 
 
@@ -508,6 +863,8 @@ class ScreenListWidget(QWidget):
         # Titre
         title = QLabel("📺 Écrans connectés")
         title.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        # Texte foncé pour contraste sur fond clair (comme le nom d'utilisateur)
+        title.setStyleSheet("color: #111111;")
         layout.addWidget(title)
         
         # Zone de scroll pour les miniatures

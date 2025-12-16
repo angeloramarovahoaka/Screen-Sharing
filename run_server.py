@@ -34,6 +34,12 @@ def main():
         default=1080,
         help="Hauteur de l'écran (défaut: 1080)"
     )
+    parser.add_argument(
+        "--log-collector",
+        type=str,
+        default=None,
+        help="Optional log collector in format host:port to forward logs"
+    )
     
     args = parser.parse_args()
     
@@ -51,6 +57,13 @@ def main():
     server = ScreenServer()
     server.screen_width = args.width
     server.screen_height = args.height
+    # Camera/webcam support removed; server always uses screen capture
+
+    # If a log collector was provided, export env var so modules forward logs
+    if args.log_collector:
+        import os
+        os.environ['SS_LOG_COLLECTOR'] = args.log_collector
+        print(f"📣 Forwarding logs to collector: {args.log_collector}")
     
     # Connecter les signaux pour afficher les messages
     server.status_changed.connect(lambda s: print(f"📢 {s}"))
@@ -58,11 +71,12 @@ def main():
     server.client_disconnected.connect(lambda c: print(f"❌ Client déconnecté: {c}"))
     server.error_occurred.connect(lambda e: print(f"⚠️ Erreur: {e}"))
     
-    # Ajouter le client et démarrer
-    server.add_client(args.client_ip)
+    # Démarrer le serveur (écoute des commandes seulement)
     server.start(args.client_ip)
     
-    print("▶️ Serveur démarré. Appuyez sur Ctrl+C pour arrêter.")
+    print("▶️ Serveur démarré (en attente de connexions).")
+    print("📝 Le streaming vidéo démarrera automatiquement quand un client se connectera.")
+    print("   Pour forcer le streaming maintenant, utilisez l'interface graphique.")
     print()
     
     try:
