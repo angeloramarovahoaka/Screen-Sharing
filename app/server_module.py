@@ -597,6 +597,8 @@ class ScreenServer(QObject):
                 mods = [k for k in key_names if k in ('ctrl', 'ctrl_l', 'ctrl_r', 'alt', 'alt_l', 'alt_r', 'shift', 'shift_l', 'shift_r', 'cmd', 'cmd_l', 'cmd_r')]
                 mains = [k for k in key_names if k not in mods]
 
+                pressed_now = []
+
                 # Press modifiers first (if not already pressed)
                 for m in mods:
                     if m not in self._pressed_modifiers:
@@ -605,6 +607,7 @@ class ScreenServer(QObject):
                             try:
                                 self.keyboard.press(mapped)
                                 self._pressed_modifiers.add(m)
+                                pressed_now.append(m)
                             except Exception:
                                 logger.exception(f"Failed to press modifier {m}")
 
@@ -632,16 +635,15 @@ class ScreenServer(QObject):
                             except Exception:
                                 logger.exception(f"Failed to send main key {k} in combo")
 
-                # Release modifiers in reverse order
-                for m in reversed(mods):
-                    if m in self._pressed_modifiers:
-                        mapped = self.get_pynput_key(m)
-                        if mapped:
-                            try:
-                                self.keyboard.release(mapped)
-                                self._pressed_modifiers.discard(m)
-                            except Exception:
-                                logger.exception(f"Failed to release modifier {m} after combo")
+                # Release only modifiers pressed by this combo (don't break a held modifier)
+                for m in reversed(pressed_now):
+                    mapped = self.get_pynput_key(m)
+                    if mapped:
+                        try:
+                            self.keyboard.release(mapped)
+                        except Exception:
+                            logger.exception(f"Failed to release modifier {m} after combo")
+                    self._pressed_modifiers.discard(m)
                 return
 
             # Fallback to existing per-key handling for press/release
@@ -650,6 +652,13 @@ class ScreenServer(QObject):
             else:
                 key_names = [command.get('key')]
             for key_name in key_names:
+                # Keep modifier state in sync (used to avoid releasing held modifiers in combo)
+                if key_name in ('ctrl', 'ctrl_l', 'ctrl_r', 'alt', 'alt_l', 'alt_r', 'shift', 'shift_l', 'shift_r', 'cmd', 'cmd_l', 'cmd_r'):
+                    if action == 'press':
+                        self._pressed_modifiers.add(key_name)
+                    elif action == 'release':
+                        self._pressed_modifiers.discard(key_name)
+
                 # Debug temporaire pour les touches directionnelles
                 if key_name in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down', 'left', 'up', 'right', 'down']:
                     logger.debug(f"DEBUG SERVER: Processing arrow key: {key_name}, action: {action}")

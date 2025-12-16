@@ -593,6 +593,9 @@ class ScreenViewer(QWidget):
         
     def keyPressEvent(self, event: QKeyEvent):
         """Gère les appuis de touches"""
+        if event.isAutoRepeat():
+            event.accept()
+            return
         if self.is_controlling and self.client:
             modifiers = event.modifiers()
             key = event.key()
@@ -612,32 +615,27 @@ class ScreenViewer(QWidget):
                 if (modifiers & Qt.MetaModifier):
                     active_mods.append('cmd')
 
-                # Find modifiers that are new (not already tracked as pressed locally)
-                new_mods = [m for m in active_mods if m not in self.pressed_modifiers]
-
                 key_name = self._get_key_name(event)
                 if key_name:
-                    # If there are new modifiers pressed simultaneously, send an atomic combo
-                    if new_mods:
-                        combo_keys = new_mods + [key_name]
-                        self.client.send_command({'type': 'key', 'action': 'combo', 'keys': combo_keys})
-                        # Mark those modifiers as pressed so future keys treat them as held
-                        for m in new_mods:
-                            self.pressed_modifiers.add(m)
+                    # If any modifiers are held, always send an atomic combo for this key.
+                    # This guarantees Ctrl+C, Ctrl+V, etc. work even if the modifier was pressed earlier.
+                    if active_mods:
+                        self.client.send_command({'type': 'key', 'action': 'combo', 'keys': active_mods + [key_name]})
                     else:
-                        # No new modifiers; just send a simple press for the main key
                         if key_name in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down', 'left', 'up', 'right', 'down']:
                             print(f"DEBUG: Sending arrow key: {key_name}")
-                        self.client.send_command({
-                            'type': 'key',
-                            'action': 'press',
-                            'key': key_name
-                        })
+                        self.client.send_command({'type': 'key', 'action': 'press', 'key': key_name})
+
+                    event.accept()
+                    return
                 
         super().keyPressEvent(event)
         
     def keyReleaseEvent(self, event: QKeyEvent):
         """Gère les relâchements de touches"""
+        if event.isAutoRepeat():
+            event.accept()
+            return
         if self.is_controlling and self.client:
             key = event.key()
             
@@ -666,6 +664,9 @@ class ScreenViewer(QWidget):
             elif key in [Qt.Key_Meta, Qt.Key_Super_L, Qt.Key_Super_R] and 'cmd' in self.pressed_modifiers:
                 self.client.send_command({'type': 'key', 'action': 'release', 'key': 'cmd'})
                 self.pressed_modifiers.discard('cmd')
+
+            event.accept()
+            return
                 
         super().keyReleaseEvent(event)
         
@@ -718,7 +719,7 @@ class ScreenViewer(QWidget):
         if key in special_keys:
             return special_keys[key]
         elif text and text.isprintable():
-            return text
+            return text.lower()
         return None
 
 
