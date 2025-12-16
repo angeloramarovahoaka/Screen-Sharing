@@ -15,7 +15,6 @@ from .client_module import ScreenClient, MultiScreenClient
 from .server_module import ScreenServer
 from .ui_login import LoginWindow, UserInfoWidget
 from .ui_screens import ScreenListWidget, ScreenViewer, ScreenThumbnail
-from .call_module import AudioCall, CallDialog, CallWidget, PYAUDIO_AVAILABLE
 from .ui_style import THEME, ToastOverlay, button_solid, button_outline, status_badge
 
 
@@ -108,7 +107,6 @@ class MainWindow(QMainWindow):
         # Composants
         self.multi_client = MultiScreenClient()
         self.server = ScreenServer()
-        self.audio_call = AudioCall()
         
         # Vues
         self.current_zoomed_screen = None
@@ -143,9 +141,7 @@ class MainWindow(QMainWindow):
         """)
         main_layout.addWidget(self.user_bar)
         
-        # Widget d'appel
-        self.call_widget = CallWidget()
-        main_layout.addWidget(self.call_widget)
+        # (Call UI removed)
         
         # Barre d'outils
         self.main_toolbar = QFrame()
@@ -254,11 +250,7 @@ class MainWindow(QMainWindow):
         self.server.status_changed.connect(lambda _s: self._refresh_app_status())
         self.server.client_connected.connect(lambda c: self.status_bar.showMessage(f"Client connecté: {c}"))
         
-        # Appel
-        self.call_widget.end_call_requested.connect(self.end_call)
-        self.call_widget.mute_toggled.connect(self.toggle_mute)
-        self.audio_call.call_started.connect(lambda: self.call_widget.start_call(self.audio_call.peer_ip))
-        self.audio_call.call_ended.connect(self.call_widget.end_call)
+        # (Call UI removed)
         
     def set_user(self, username):
         """Définit l'utilisateur connecté"""
@@ -278,7 +270,6 @@ class MainWindow(QMainWindow):
             # Fermer toutes les connexions
             self.multi_client.disconnect_all()
             self.server.stop()
-            self.audio_call.end_call()
             
             # Vider la liste
             for screen_id in list(self.screen_list.thumbnails.keys()):
@@ -420,13 +411,8 @@ class MainWindow(QMainWindow):
         if self._pre_zoom_window_state is None:
             self._pre_zoom_window_state = self.windowState()
 
-        # Masquer les panneaux du haut/bas pour ne rien cacher de l'écran partagé
         try:
             self.user_bar.hide()
-        except Exception:
-            pass
-        try:
-            self.call_widget.hide()
         except Exception:
             pass
         try:
@@ -481,10 +467,6 @@ class MainWindow(QMainWindow):
         # Restaurer les panneaux
         try:
             self.user_bar.show()
-        except Exception:
-            pass
-        try:
-            self.call_widget.show()
         except Exception:
             pass
         try:
@@ -551,34 +533,7 @@ class MainWindow(QMainWindow):
                     self.toast.show_toast(f"Streaming démarré vers {client_ip}", kind="success")
                     self._refresh_app_status()
                     
-    def show_call_dialog(self):
-        """Affiche le dialog pour passer un appel"""
-        if self.audio_call.is_in_call:
-            return
-            
-        dialog = CallDialog(self)
-        dialog.call_requested.connect(self.start_call)
-        dialog.exec()
-        
-    def start_call(self, peer_ip):
-        """Démarre un appel"""
-        if self.audio_call.start_call(peer_ip):
-            self.status_bar.showMessage(f"Appel en cours avec {peer_ip}")
-            self.toast.show_toast(f"Appel démarré: {peer_ip}", kind="success")
-        else:
-            QMessageBox.warning(self, "Erreur", "Impossible de démarrer l'appel")
-            self.toast.show_toast("Impossible de démarrer l'appel", kind="error")
-            
-    def end_call(self):
-        """Termine l'appel"""
-        self.audio_call.end_call()
-        self.status_bar.showMessage("Appel terminé")
-        self.toast.show_toast("Appel terminé", kind="info")
-        
-    def toggle_mute(self):
-        """Bascule le mode muet"""
-        muted = self.audio_call.toggle_mute()
-        self.call_widget.set_muted(muted)
+    # Call UI removed
         
     def _on_screen_selected(self, screen_id):
         """Callback quand un écran est sélectionné"""
@@ -599,5 +554,5 @@ class MainWindow(QMainWindow):
         # Nettoyer les ressources
         self.multi_client.disconnect_all()
         self.server.stop()
-        self.audio_call.cleanup()
+        # Call subsystem removed; nothing to cleanup here
         event.accept()
