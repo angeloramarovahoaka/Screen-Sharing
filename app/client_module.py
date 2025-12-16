@@ -302,9 +302,13 @@ class ScreenClient(QObject):
             
         try:
             message = json.dumps(command_dict) + '\n'
+            if os.getenv("SS_INPUT_DEBUG", "0") == "1":
+                logger.info(f"[INPUT-CLIENT] send_command: {command_dict}")
             self.command_socket.sendall(message.encode('utf-8'))
             return True
         except Exception as e:
+            if os.getenv("SS_INPUT_DEBUG", "0") == "1":
+                logger.exception(f"[INPUT-CLIENT] send_command failed: {e}")
             return False
             
     def send_mouse_move(self, x, y, widget_width, widget_height):

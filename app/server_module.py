@@ -33,6 +33,11 @@ from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, JPEG_QUALITY, DEFAULT
 # Safe maximum UDP payload size (bytes). Keep comfortably under 65507 and typical MTU.
 MAX_UDP_PAYLOAD = 60000
 
+
+def _ui_input_debug(msg: str):
+    if os.getenv("SS_INPUT_DEBUG", "0") == "1":
+        logger.info(f"[INPUT-SERVER] {msg}")
+
 # --- Logging configuration ---
 LOG_LEVEL = os.getenv("SS_LOG_LEVEL", "INFO").upper()
 logger = logging.getLogger("screenshare.server")
@@ -590,6 +595,7 @@ class ScreenServer(QObject):
                         
         elif cmd_type == 'key':
             action = command['action']
+            _ui_input_debug(f"recv key action={action} payload={command}")
             # Support a new atomic combo action: send modifiers + main keys in one command
             if action == 'combo' and isinstance(command.get('keys'), (list, tuple)):
                 key_names = list(command.get('keys'))
@@ -610,6 +616,7 @@ class ScreenServer(QObject):
                                 pressed_now.append(m)
                             except Exception:
                                 logger.exception(f"Failed to press modifier {m}")
+                                _ui_input_debug(f"press modifier failed {m}")
 
                 # Press and release main keys
                 for k in mains:
@@ -626,6 +633,7 @@ class ScreenServer(QObject):
                                     self.keyboard.release(mapped)
                                 except Exception:
                                     logger.exception(f"Failed to send main key {k} in combo")
+                                    _ui_input_debug(f"main key combo failed {k}")
                     else:
                         mapped = self.get_pynput_key(k)
                         if mapped:
@@ -634,6 +642,7 @@ class ScreenServer(QObject):
                                 self.keyboard.release(mapped)
                             except Exception:
                                 logger.exception(f"Failed to send main key {k} in combo")
+                                _ui_input_debug(f"pynput key failed {key_name} action={action}")
 
                 # Release only modifiers pressed by this combo (don't break a held modifier)
                 for m in reversed(pressed_now):
@@ -643,6 +652,7 @@ class ScreenServer(QObject):
                             self.keyboard.release(mapped)
                         except Exception:
                             logger.exception(f"Failed to release modifier {m} after combo")
+                            _ui_input_debug(f"release modifier combo failed {m}")
                     self._pressed_modifiers.discard(m)
                 return
 
@@ -658,6 +668,7 @@ class ScreenServer(QObject):
                         self._pressed_modifiers.add(key_name)
                     elif action == 'release':
                         self._pressed_modifiers.discard(key_name)
+                _ui_input_debug(f"per-key {action} {key_name}")
 
                 # Debug temporaire pour les touches directionnelles
                 if key_name in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down', 'left', 'up', 'right', 'down']:

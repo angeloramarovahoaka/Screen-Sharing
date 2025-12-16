@@ -379,6 +379,16 @@ class ScreenViewer(QWidget):
         self.screen_label.setMouseTracking(True)
         self.screen_label.setStyleSheet("background-color: #1a1a1a;")
         self.screen_area.setWidget(self.screen_label)
+
+        # Forward key events from viewport/label to the viewer
+        self.screen_area.setFocusPolicy(Qt.NoFocus)
+        self.screen_label.setFocusPolicy(Qt.NoFocus)
+        self.screen_area.viewport().setFocusPolicy(Qt.NoFocus)
+        self.screen_area.viewport().installEventFilter(self)
+        self.screen_label.installEventFilter(self)
+
+        # Ensure viewer itself can take focus
+        self.setFocusPolicy(Qt.StrongFocus)
         
         layout.addWidget(self.screen_area)
 
@@ -669,6 +679,17 @@ class ScreenViewer(QWidget):
             return
                 
         super().keyReleaseEvent(event)
+
+    def eventFilter(self, obj, event):
+        # Forward key events from child widgets to our handlers
+        if event.type() in (event.KeyPress, event.KeyRelease):
+            if obj in (self.screen_area.viewport(), self.screen_label):
+                if event.type() == event.KeyPress:
+                    self.keyPressEvent(event)
+                else:
+                    self.keyReleaseEvent(event)
+                return True
+        return super().eventFilter(obj, event)
         
     def _get_key_name(self, event: QKeyEvent):
         """Convertit un événement clavier en nom de touche"""
