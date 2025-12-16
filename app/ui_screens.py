@@ -600,6 +600,32 @@ class ScreenViewer(QWidget):
                 'dy': dy
             })
         super().wheelEvent(event)
+
+    def event(self, event):
+        """Intercepte les événements avant le traitement standard de Qt.
+        Nécessaire pour capturer Tab, F1-F12 et autres touches que Qt utilise pour la navigation.
+        """
+        from PySide6.QtCore import QEvent
+        if event.type() == QEvent.Type.KeyPress:
+            key = event.key()
+            # Intercepter Tab, Backtab, et touches F1-F12 avant Qt
+            if key in (Qt.Key_Tab, Qt.Key_Backtab, 
+                       Qt.Key_F1, Qt.Key_F2, Qt.Key_F3, Qt.Key_F4, Qt.Key_F5, Qt.Key_F6,
+                       Qt.Key_F7, Qt.Key_F8, Qt.Key_F9, Qt.Key_F10, Qt.Key_F11, Qt.Key_F12,
+                       Qt.Key_Escape):
+                if self.is_controlling and self.client:
+                    self.keyPressEvent(event)
+                    return True  # Event handled, don't let Qt use it for navigation
+        elif event.type() == QEvent.Type.KeyRelease:
+            key = event.key()
+            if key in (Qt.Key_Tab, Qt.Key_Backtab,
+                       Qt.Key_F1, Qt.Key_F2, Qt.Key_F3, Qt.Key_F4, Qt.Key_F5, Qt.Key_F6,
+                       Qt.Key_F7, Qt.Key_F8, Qt.Key_F9, Qt.Key_F10, Qt.Key_F11, Qt.Key_F12,
+                       Qt.Key_Escape):
+                if self.is_controlling and self.client:
+                    self.keyReleaseEvent(event)
+                    return True
+        return super().event(event)
         
     def keyPressEvent(self, event: QKeyEvent):
         """Gère les appuis de touches"""

@@ -621,7 +621,7 @@ class ScreenServer(QObject):
                 # Press and release main keys
                 for k in mains:
                     _ui_input_debug(f"combo main key: {k}")
-                    # Handle arrow keys specially
+                    # Handle arrow keys specially on Windows
                     if k in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down']:
                         if platform.system() == 'Windows':
                             # Windows: use ctypes press then release
@@ -655,17 +655,20 @@ class ScreenServer(QObject):
                                     logger.exception(f"Failed arrow key {k}: {e}")
                                     _ui_input_debug(f"Arrow {k} FAILED: {e}")
                     else:
-                        # Normal keys
+                        # All other keys (including F1-F12, Tab, etc.)
                         mapped = self.get_pynput_key(k)
+                        _ui_input_debug(f"Combo key '{k}' mapped to: {mapped}")
                         if mapped:
                             try:
                                 self.keyboard.press(mapped)
-                                time.sleep(0.01)
+                                time.sleep(0.02)  # Small delay for reliability
                                 self.keyboard.release(mapped)
                                 _ui_input_debug(f"Key {k} sent via pynput")
                             except Exception as e:
                                 logger.exception(f"Failed main key {k}: {e}")
                                 _ui_input_debug(f"Key {k} FAILED: {e}")
+                        else:
+                            _ui_input_debug(f"No mapping for combo key '{k}'")
 
                 # Release only modifiers pressed by this combo (don't break a held modifier)
                 for m in reversed(pressed_now):
@@ -685,6 +688,10 @@ class ScreenServer(QObject):
             else:
                 key_names = [command.get('key')]
             for key_name in key_names:
+                if not key_name:
+                    _ui_input_debug(f"Skipping None key_name")
+                    continue
+                    
                 # Keep modifier state in sync (used to avoid releasing held modifiers in combo)
                 if key_name in ('ctrl', 'ctrl_l', 'ctrl_r', 'alt', 'alt_l', 'alt_r', 'shift', 'shift_l', 'shift_r', 'cmd', 'cmd_l', 'cmd_r'):
                     if action == 'press':
@@ -693,39 +700,51 @@ class ScreenServer(QObject):
                         self._pressed_modifiers.discard(key_name)
                 _ui_input_debug(f"per-key {action} {key_name}")
 
-                # Debug temporaire pour les touches directionnelles
-                if key_name in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down', 'left', 'up', 'right', 'down']:
-                    logger.debug(f"DEBUG SERVER: Processing arrow key: {key_name}, action: {action}")
-                
                 # Gestion spéciale des touches directionnelles sur Windows
                 arrow_keys = ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down']
                 if key_name in arrow_keys:
                     if action == 'press':
-                        if not self._press_arrow_key(key_name):
-                            # Fallback à pynput si ctypes échoue
+                        if platform.system() == 'Windows':
+                            if not self._press_arrow_key(key_name):
+                                # Fallback à pynput si ctypes échoue
+                                pynput_key = self.get_pynput_key(key_name)
+                                if pynput_key:
+                                    self.keyboard.press(pynput_key)
+                        else:
+                            # Linux/Mac: use pynput
                             pynput_key = self.get_pynput_key(key_name)
                             if pynput_key:
                                 self.keyboard.press(pynput_key)
                     elif action == 'release':
-                        if not self._release_arrow_key(key_name):
-                            # Fallback à pynput si ctypes échoue
+                        if platform.system() == 'Windows':
+                            if not self._release_arrow_key(key_name):
+                                # Fallback à pynput si ctypes échoue
+                                pynput_key = self.get_pynput_key(key_name)
+                                if pynput_key:
+                                    self.keyboard.release(pynput_key)
+                        else:
                             pynput_key = self.get_pynput_key(key_name)
                             if pynput_key:
                                 self.keyboard.release(pynput_key)
                 else:
                     # Touches normales via pynput
                     pynput_key = self.get_pynput_key(key_name)
+                    _ui_input_debug(f"pynput_key for '{key_name}': {pynput_key}")
                     
                     if pynput_key:
                         try:
                             if action == 'press':
                                 self.keyboard.press(pynput_key)
+                                _ui_input_debug(f"Pressed {key_name} -> {pynput_key}")
                             elif action == 'release':
                                 self.keyboard.release(pynput_key)
+                                _ui_input_debug(f"Released {key_name} -> {pynput_key}")
                         except Exception as e:
                             logger.error(f"Failed to execute key action {action} for {key_name}: {e}")
+                            _ui_input_debug(f"FAILED {action} {key_name}: {e}")
                     else:
                         logger.warning(f"Could not map key_name '{key_name}' to pynput key")
+                        _ui_input_debug(f"No mapping for '{key_name}'")
                     
     def add_client(self, client_ip):
         """Ajoute un client pour recevoir le flux vidéo"""
