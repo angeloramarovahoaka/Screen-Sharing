@@ -134,20 +134,43 @@ class ScreenThumbnail(QFrame):
         self.menu_button = QToolButton()
         self.menu_button.setText("⋮")
         self.menu_button.setPopupMode(QToolButton.InstantPopup)
+        # Improve contrast: darker text, subtle hover background
         self.menu_button.setStyleSheet("""
             QToolButton {
                 border: none;
-                padding: 2px 5px;
+                padding: 2px 6px;
+                color: #111111;
+                background: transparent;
+                font-weight: 600;
             }
             QToolButton:hover {
-                background-color: rgba(0,0,0,0.1);
+                background-color: rgba(0,0,0,0.04);
                 border-radius: 3px;
+            }
+            QToolButton:pressed {
+                background-color: rgba(0,0,0,0.06);
             }
         """)
         
         menu = QMenu(self.menu_button)
         menu.addAction("🔍 Zoom", lambda: self.double_clicked.emit(self.screen_id))
         menu.addAction("❌ Déconnecter", lambda: self.remove_requested.emit(self.screen_id))
+        # Menu style for better visibility on grey backgrounds
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: white;
+                color: #111111;
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                padding: 4px;
+            }
+            QMenu::item {
+                padding: 6px 12px;
+            }
+            QMenu::item:selected {
+                background-color: #f0f0f0;
+            }
+        """)
         self.menu_button.setMenu(menu)
         info_layout.addWidget(self.menu_button)
         
