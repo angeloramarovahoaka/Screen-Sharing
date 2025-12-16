@@ -111,6 +111,8 @@ class ScreenClient(QObject):
             # Socket commandes TCP
             logger.info(f"[CONNECT] Connecting TCP command socket to {server_ip}:{COMMAND_PORT}...")
             self.command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # Désactiver Nagle pour réduire la latence des inputs
+            self.command_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             self.command_socket.settimeout(5.0)
             self.command_socket.connect((server_ip, COMMAND_PORT))
             logger.info(f"[CONNECT] TCP connected! Local addr: {self.command_socket.getsockname()}")

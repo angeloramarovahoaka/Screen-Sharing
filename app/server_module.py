@@ -627,7 +627,7 @@ class ScreenServer(QObject):
                             # Windows: use ctypes press then release
                             pressed = self._press_arrow_key(k)
                             if pressed:
-                                time.sleep(0.02)
+                                time.sleep(0.005)  # Réduit pour moins de latence
                                 self._release_arrow_key(k)
                                 _ui_input_debug(f"Arrow {k} sent via ctypes")
                             else:
@@ -636,7 +636,7 @@ class ScreenServer(QObject):
                                 if mapped:
                                     try:
                                         self.keyboard.press(mapped)
-                                        time.sleep(0.02)
+                                        time.sleep(0.005)
                                         self.keyboard.release(mapped)
                                         _ui_input_debug(f"Arrow {k} sent via pynput (fallback)")
                                     except Exception as e:
@@ -648,7 +648,7 @@ class ScreenServer(QObject):
                             if mapped:
                                 try:
                                     self.keyboard.press(mapped)
-                                    time.sleep(0.02)
+                                    time.sleep(0.005)
                                     self.keyboard.release(mapped)
                                     _ui_input_debug(f"Arrow {k} sent via pynput")
                                 except Exception as e:
@@ -661,7 +661,7 @@ class ScreenServer(QObject):
                         if mapped:
                             try:
                                 self.keyboard.press(mapped)
-                                time.sleep(0.02)  # Small delay for reliability
+                                time.sleep(0.005)  # Réduit pour moins de latence
                                 self.keyboard.release(mapped)
                                 _ui_input_debug(f"Key {k} sent via pynput")
                             except Exception as e:
