@@ -11,7 +11,7 @@ from PySide6.QtGui import (
     QImage, QPixmap, QPainter, QFont, QMouseEvent, 
     QKeyEvent, QWheelEvent, QCursor, QColor, QLinearGradient
 )
-
+from PySide6.QtCore import QEvent
 from .client_module import ScreenClient
 
 
@@ -685,9 +685,10 @@ class ScreenViewer(QWidget):
 
     def eventFilter(self, obj, event):
         # Forward key events from child widgets to our handlers
-        if event.type() in (event.KeyPress, event.KeyRelease):
+        
+        if event.type() in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease):
             if obj in (self.screen_area.viewport(), self.screen_label):
-                if event.type() == event.KeyPress:
+                if event.type() == QEvent.Type.KeyPress:
                     self.keyPressEvent(event)
                 else:
                     self.keyReleaseEvent(event)
