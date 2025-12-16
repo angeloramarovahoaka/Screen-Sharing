@@ -392,6 +392,20 @@ class MainWindow(QMainWindow):
         
         # Connecter les frames
         client.frame_received.connect(viewer.update_frame)
+
+        # Show the stream at 100% (no fitting) by default when zooming: treat zoom as 1:1
+        try:
+            viewer.fit_to_window = False
+            viewer.zoom_level = 1.0
+            # If we already have a latest frame, display it immediately at 100%
+            try:
+                latest = client.get_latest_frame()
+                if latest is not None:
+                    viewer.update_frame(latest)
+            except Exception:
+                pass
+        except Exception:
+            pass
             
         # Ajouter le nouveau
         self.zoom_layout.addWidget(viewer)
