@@ -12,6 +12,7 @@ import threading
 import json
 import platform
 from PySide6.QtCore import QObject, Signal, QThread
+from PySide6.QtGui import QImage
 from pynput.mouse import Controller as MouseController, Button
 from pynput.keyboard import Controller as KeyboardController, Key
 import logging
@@ -100,6 +101,11 @@ class ScreenServer(QObject):
         # Threads
         self.video_thread = None
         self.command_thread = None
+        # UDP video receiver thread (clients stream into server)
+        self.video_receiver_thread = None
+
+        # Store latest frames per client (keyed by client_id or ip)
+        self.client_frames = {}
         
         # Mapping des boutons souris
         self.button_map = {
@@ -213,6 +219,14 @@ class ScreenServer(QObject):
         # Démarrer le thread des commandes
         self.command_thread = threading.Thread(target=self._command_listener, daemon=True)
         self.command_thread.start()
+
+        # Start video receiver to accept incoming client streams
+        try:
+            self.video_receiver_thread = threading.Thread(target=self._video_receiver, daemon=True)
+            self.video_receiver_thread.start()
+            logger.info(f"Started video receiver on UDP port {VIDEO_PORT}")
+        except Exception:
+            logger.exception("Failed to start video receiver thread")
         
         # NE PAS démarrer le streaming automatiquement
         # Il sera démarré via start_streaming() sur demande
@@ -342,6 +356,61 @@ class ScreenServer(QObject):
                 vid.release()
             if self.video_socket:
                 self.video_socket.close()
+
+    def _video_receiver(self):
+        """Receive incoming UDP video streams from clients (base64 JPEG) and store latest frame."""
+        sock = None
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(('0.0.0.0', VIDEO_PORT))
+            sock.settimeout(0.5)
+            logger.info(f"Video receiver listening on 0.0.0.0:{VIDEO_PORT}")
+
+            while self.is_running:
+                try:
+                    data, addr = sock.recvfrom(BUFFER_SIZE)
+                    if not data:
+                        continue
+                    try:
+                        bdata = base64.b64decode(data)
+                        npdata = np.frombuffer(bdata, dtype=np.uint8)
+                        frame = cv2.imdecode(npdata, cv2.IMREAD_COLOR)
+                        if frame is None:
+                            continue
+                        # Convert to QImage
+                        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        h, w, ch = frame_rgb.shape
+                        bytes_per_line = ch * w
+                        qimg = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888).copy()
+
+                        client_ip = addr[0]
+                        client_id = f"{client_ip}:{addr[1]}"
+                        # Store by IP so admin can reference by ip:port
+                        self.client_frames[client_id] = qimg
+                        try:
+                            self.frame_received.emit(client_id, qimg)
+                        except Exception:
+                            pass
+                    except Exception as e:
+                        logger.debug(f"Video receiver decode error from {addr}: {e}")
+                except socket.timeout:
+                    continue
+                except Exception as e:
+                    if self.is_running:
+                        logger.exception(f"Video receiver error: {e}")
+                        time.sleep(0.01)
+        except Exception as e:
+            logger.exception(f"Video receiver fatal error: {e}")
+        finally:
+            try:
+                if sock:
+                    sock.close()
+            except:
+                pass
+
+    # Signal emitted when a frame is received from a client
+    frame_received = Signal(str, QImage)
                 
     def _command_listener(self):
         """Thread d'écoute des commandes TCP"""

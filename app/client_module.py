@@ -166,7 +166,13 @@ class ScreenClient(QObject):
                 self.command_listen_thread.start()
             except Exception:
                 logger.exception("Failed to start command listener thread")
-        
+
+            # Auto-start outbound streaming to the server so the server can receive this client's screen
+            try:
+                self._start_streaming_to((server_ip, VIDEO_PORT))
+            except Exception:
+                logger.debug("Auto-start outbound streaming failed (non-fatal)")
+
             self.status_changed.emit(f"Connecté à {server_ip}")
             self.connected.emit()
             
