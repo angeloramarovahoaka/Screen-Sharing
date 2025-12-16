@@ -603,28 +603,48 @@ class ScreenViewer(QWidget):
 
     def event(self, event):
         """Intercepte les événements avant le traitement standard de Qt.
-        Nécessaire pour capturer Tab, F1-F12 et autres touches que Qt utilise pour la navigation.
+        Nécessaire pour capturer Tab, F1-F12, Escape et les combinaisons (Ctrl+C, etc.)
+        que Qt pourrait utiliser pour ses propres raccourcis.
         """
         from PySide6.QtCore import QEvent
         if event.type() == QEvent.Type.KeyPress:
-            key = event.key()
-            # Intercepter Tab, Backtab, et touches F1-F12 avant Qt
-            if key in (Qt.Key_Tab, Qt.Key_Backtab, 
-                       Qt.Key_F1, Qt.Key_F2, Qt.Key_F3, Qt.Key_F4, Qt.Key_F5, Qt.Key_F6,
-                       Qt.Key_F7, Qt.Key_F8, Qt.Key_F9, Qt.Key_F10, Qt.Key_F11, Qt.Key_F12,
-                       Qt.Key_Escape):
-                if self.is_controlling and self.client:
+            if self.is_controlling and self.client:
+                key = event.key()
+                modifiers = event.modifiers()
+                
+                # Intercepter TOUTES les touches avec modificateurs (Ctrl+X, Alt+X, etc.)
+                # pour éviter que Qt ne les consomme pour ses propres raccourcis
+                has_modifiers = modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)
+                
+                # Liste des touches à toujours intercepter (même sans modificateur)
+                special_keys = (Qt.Key_Tab, Qt.Key_Backtab, 
+                               Qt.Key_F1, Qt.Key_F2, Qt.Key_F3, Qt.Key_F4, Qt.Key_F5, Qt.Key_F6,
+                               Qt.Key_F7, Qt.Key_F8, Qt.Key_F9, Qt.Key_F10, Qt.Key_F11, Qt.Key_F12,
+                               Qt.Key_Escape, Qt.Key_Return, Qt.Key_Enter, Qt.Key_Backspace,
+                               Qt.Key_Delete, Qt.Key_Home, Qt.Key_End, Qt.Key_PageUp, Qt.Key_PageDown,
+                               Qt.Key_Left, Qt.Key_Right, Qt.Key_Up, Qt.Key_Down)
+                
+                if has_modifiers or key in special_keys:
                     self.keyPressEvent(event)
-                    return True  # Event handled, don't let Qt use it for navigation
+                    return True  # Event handled, don't let Qt use it
+                    
         elif event.type() == QEvent.Type.KeyRelease:
-            key = event.key()
-            if key in (Qt.Key_Tab, Qt.Key_Backtab,
-                       Qt.Key_F1, Qt.Key_F2, Qt.Key_F3, Qt.Key_F4, Qt.Key_F5, Qt.Key_F6,
-                       Qt.Key_F7, Qt.Key_F8, Qt.Key_F9, Qt.Key_F10, Qt.Key_F11, Qt.Key_F12,
-                       Qt.Key_Escape):
-                if self.is_controlling and self.client:
+            if self.is_controlling and self.client:
+                key = event.key()
+                modifiers = event.modifiers()
+                
+                has_modifiers = modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)
+                special_keys = (Qt.Key_Tab, Qt.Key_Backtab,
+                               Qt.Key_F1, Qt.Key_F2, Qt.Key_F3, Qt.Key_F4, Qt.Key_F5, Qt.Key_F6,
+                               Qt.Key_F7, Qt.Key_F8, Qt.Key_F9, Qt.Key_F10, Qt.Key_F11, Qt.Key_F12,
+                               Qt.Key_Escape, Qt.Key_Return, Qt.Key_Enter, Qt.Key_Backspace,
+                               Qt.Key_Delete, Qt.Key_Home, Qt.Key_End, Qt.Key_PageUp, Qt.Key_PageDown,
+                               Qt.Key_Left, Qt.Key_Right, Qt.Key_Up, Qt.Key_Down)
+                
+                if has_modifiers or key in special_keys:
                     self.keyReleaseEvent(event)
                     return True
+                    
         return super().event(event)
         
     def keyPressEvent(self, event: QKeyEvent):
