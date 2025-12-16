@@ -789,8 +789,38 @@ class ScreenViewer(QWidget):
         
         if key in special_keys:
             return special_keys[key]
-        elif text and text.isprintable():
+        
+        # Si text est disponible et imprimable, l'utiliser
+        if text and text.isprintable():
             return text.lower()
+        
+        # Fallback: convertir le code de touche en caractère
+        # Quand Ctrl/Alt est pressé, event.text() est souvent vide
+        # Qt.Key_A = 65, Qt.Key_Z = 90 (lettres majuscules)
+        # Qt.Key_0 = 48, Qt.Key_9 = 57 (chiffres)
+        if Qt.Key_A <= key <= Qt.Key_Z:
+            return chr(key).lower()  # 65 -> 'a', 66 -> 'b', etc.
+        elif Qt.Key_0 <= key <= Qt.Key_9:
+            return chr(key)  # 48 -> '0', 49 -> '1', etc.
+        
+        # Touches spéciales du pavé numérique et autres caractères
+        numpad_keys = {
+            Qt.Key_Minus: '-',
+            Qt.Key_Plus: '+',
+            Qt.Key_Equal: '=',
+            Qt.Key_BracketLeft: '[',
+            Qt.Key_BracketRight: ']',
+            Qt.Key_Backslash: '\\',
+            Qt.Key_Semicolon: ';',
+            Qt.Key_Apostrophe: "'",
+            Qt.Key_Comma: ',',
+            Qt.Key_Period: '.',
+            Qt.Key_Slash: '/',
+            Qt.Key_QuoteLeft: '`',
+        }
+        if key in numpad_keys:
+            return numpad_keys[key]
+            
         return None
 
 
