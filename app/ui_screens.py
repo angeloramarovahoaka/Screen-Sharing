@@ -126,6 +126,8 @@ class ScreenThumbnail(QFrame):
         # Nom de l'écran
         self.name_label = QLabel(self.screen_name)
         self.name_label.setFont(QFont("Segoe UI", 9))
+        # Ensure high contrast on any background (dark text)
+        self.name_label.setStyleSheet("color: #111111;")
         info_layout.addWidget(self.name_label)
         
         info_layout.addStretch()
