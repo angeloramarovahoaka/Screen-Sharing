@@ -413,6 +413,13 @@ class MainWindow(QMainWindow):
         self.zoom_layout.addWidget(viewer)
         self.screen_viewers[screen_id] = viewer
         self.current_zoomed_screen = screen_id
+        try:
+            viewer.setFocus(Qt.OtherFocusReason)
+        except Exception:
+            try:
+                viewer.setFocus()
+            except Exception:
+                pass
         
         # Afficher la vue zoom
         self.content_stack.setCurrentIndex(1)

@@ -92,6 +92,8 @@ class ScreenServer(QObject):
         self.is_running = False
         self.is_streaming = False  # Contrôle si le streaming vidéo est actif
         self.connected_clients = {}
+        # Track pressed modifiers for combos initiated from clients
+        self._pressed_modifiers = set()
         
         # Configuration
         self.use_webcam = USE_WEBCAM
@@ -588,14 +590,69 @@ class ScreenServer(QObject):
                         
         elif cmd_type == 'key':
             action = command['action']
+            # Support a new atomic combo action: send modifiers + main keys in one command
+            if action == 'combo' and isinstance(command.get('keys'), (list, tuple)):
+                key_names = list(command.get('keys'))
+                # Separate modifiers and main keys
+                mods = [k for k in key_names if k in ('ctrl', 'ctrl_l', 'ctrl_r', 'alt', 'alt_l', 'alt_r', 'shift', 'shift_l', 'shift_r', 'cmd', 'cmd_l', 'cmd_r')]
+                mains = [k for k in key_names if k not in mods]
+
+                # Press modifiers first (if not already pressed)
+                for m in mods:
+                    if m not in self._pressed_modifiers:
+                        mapped = self.get_pynput_key(m)
+                        if mapped:
+                            try:
+                                self.keyboard.press(mapped)
+                                self._pressed_modifiers.add(m)
+                            except Exception:
+                                logger.exception(f"Failed to press modifier {m}")
+
+                # Press and release main keys
+                for k in mains:
+                    # Debug for arrow keys
+                    if k in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down', 'left', 'up', 'right', 'down']:
+                        logger.debug(f"DEBUG SERVER: Processing arrow key in combo: {k}")
+                    # Try platform-optimized arrow handling first
+                    if k in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down']:
+                        if not self._press_arrow_key(k):
+                            mapped = self.get_pynput_key(k)
+                            if mapped:
+                                try:
+                                    self.keyboard.press(mapped)
+                                    self.keyboard.release(mapped)
+                                except Exception:
+                                    logger.exception(f"Failed to send main key {k} in combo")
+                    else:
+                        mapped = self.get_pynput_key(k)
+                        if mapped:
+                            try:
+                                self.keyboard.press(mapped)
+                                self.keyboard.release(mapped)
+                            except Exception:
+                                logger.exception(f"Failed to send main key {k} in combo")
+
+                # Release modifiers in reverse order
+                for m in reversed(mods):
+                    if m in self._pressed_modifiers:
+                        mapped = self.get_pynput_key(m)
+                        if mapped:
+                            try:
+                                self.keyboard.release(mapped)
+                                self._pressed_modifiers.discard(m)
+                            except Exception:
+                                logger.exception(f"Failed to release modifier {m} after combo")
+                return
+
+            # Fallback to existing per-key handling for press/release
             if 'keys' in command:
                 key_names = command['keys']
             else:
-                key_names = [command['key']]
+                key_names = [command.get('key')]
             for key_name in key_names:
                 # Debug temporaire pour les touches directionnelles
                 if key_name in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down', 'left', 'up', 'right', 'down']:
-                    print(f"DEBUG SERVER: Processing arrow key: {key_name}, action: {action}")
+                    logger.debug(f"DEBUG SERVER: Processing arrow key: {key_name}, action: {action}")
                 
                 # Gestion spéciale des touches directionnelles sur Windows
                 arrow_keys = ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down']

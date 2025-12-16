@@ -269,6 +269,15 @@ class ScreenViewer(QWidget):
         self.setFocusPolicy(Qt.StrongFocus)
         self.setMouseTracking(True)
         self.setup_ui()
+
+        # Ensure the viewer receives keyboard focus so key events go to it
+        try:
+            self.setFocus(Qt.OtherFocusReason)
+        except Exception:
+            try:
+                self.setFocus()
+            except Exception:
+                pass
         
     def setup_ui(self):
         """Configure l'interface"""
@@ -591,36 +600,39 @@ class ScreenViewer(QWidget):
             # Vérifier si c'est une touche modificatrice elle-même
             is_modifier_key = key in [Qt.Key_Control, Qt.Key_Shift, Qt.Key_Alt, Qt.Key_Meta, 
                                       Qt.Key_Super_L, Qt.Key_Super_R]
-            
             if not is_modifier_key:
-                # C'est une touche normale, envoyer les modificateurs actifs d'abord (une seule fois)
-                if (modifiers & Qt.ControlModifier) and 'ctrl' not in self.pressed_modifiers:
-                    self.client.send_command({'type': 'key', 'action': 'press', 'key': 'ctrl'})
-                    self.pressed_modifiers.add('ctrl')
-                    
-                if (modifiers & Qt.ShiftModifier) and 'shift' not in self.pressed_modifiers:
-                    self.client.send_command({'type': 'key', 'action': 'press', 'key': 'shift'})
-                    self.pressed_modifiers.add('shift')
-                    
-                if (modifiers & Qt.AltModifier) and 'alt' not in self.pressed_modifiers:
-                    self.client.send_command({'type': 'key', 'action': 'press', 'key': 'alt'})
-                    self.pressed_modifiers.add('alt')
-                    
-                if (modifiers & Qt.MetaModifier) and 'cmd' not in self.pressed_modifiers:
-                    self.client.send_command({'type': 'key', 'action': 'press', 'key': 'cmd'})
-                    self.pressed_modifiers.add('cmd')
-            
-            # Envoyer la touche principale
-            key_name = self._get_key_name(event)
-            if key_name:
-                # Debug temporaire pour les touches directionnelles
-                if key_name in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down', 'left', 'up', 'right', 'down']:
-                    print(f"DEBUG: Sending arrow key: {key_name}")
-                self.client.send_command({
-                    'type': 'key',
-                    'action': 'press',
-                    'key': key_name
-                })
+                # Determine active modifier names from the event
+                active_mods = []
+                if (modifiers & Qt.ControlModifier):
+                    active_mods.append('ctrl')
+                if (modifiers & Qt.ShiftModifier):
+                    active_mods.append('shift')
+                if (modifiers & Qt.AltModifier):
+                    active_mods.append('alt')
+                if (modifiers & Qt.MetaModifier):
+                    active_mods.append('cmd')
+
+                # Find modifiers that are new (not already tracked as pressed locally)
+                new_mods = [m for m in active_mods if m not in self.pressed_modifiers]
+
+                key_name = self._get_key_name(event)
+                if key_name:
+                    # If there are new modifiers pressed simultaneously, send an atomic combo
+                    if new_mods:
+                        combo_keys = new_mods + [key_name]
+                        self.client.send_command({'type': 'key', 'action': 'combo', 'keys': combo_keys})
+                        # Mark those modifiers as pressed so future keys treat them as held
+                        for m in new_mods:
+                            self.pressed_modifiers.add(m)
+                    else:
+                        # No new modifiers; just send a simple press for the main key
+                        if key_name in ['arrow_left', 'arrow_up', 'arrow_right', 'arrow_down', 'left', 'up', 'right', 'down']:
+                            print(f"DEBUG: Sending arrow key: {key_name}")
+                        self.client.send_command({
+                            'type': 'key',
+                            'action': 'press',
+                            'key': key_name
+                        })
                 
         super().keyPressEvent(event)
         
