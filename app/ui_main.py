@@ -54,11 +54,15 @@ class AddScreenDialog(QDialog):
         
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("Mon PC Bureau")
-        form_layout.addRow("Nom:", self.name_input)
+        name_label = QLabel("Nom:")
+        name_label.setStyleSheet("color: #111111;")
+        form_layout.addRow(name_label, self.name_input)
         
         self.ip_input = QLineEdit()
         self.ip_input.setPlaceholderText("192.168.1.100")
-        form_layout.addRow("Adresse IP:", self.ip_input)
+        ip_label = QLabel("Adresse IP:")
+        ip_label.setStyleSheet("color: #111111;")
+        form_layout.addRow(ip_label, self.ip_input)
         
         layout.addLayout(form_layout)
         
