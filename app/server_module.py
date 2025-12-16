@@ -359,20 +359,29 @@ class ScreenServer(QObject):
                         cv2.IMWRITE_JPEG_PROGRESSIVE,
                         1,
                     ]
+                    # Debug: log capture shape before encoding
+                    try:
+                        logger.debug(f"Captured frame shape: {getattr(frame, 'shape', 'unknown')}")
+                    except Exception:
+                        pass
+
                     encoded, buffer = cv2.imencode('.jpg', frame, encode_params)
                     if not encoded:
+                        logger.debug("cv2.imencode returned False (failed to encode frame)")
                         continue
                     jpeg_bytes = buffer.tobytes()
+                    logger.debug(f"Encoded JPEG size: {len(jpeg_bytes)} bytes")
 
                     # Send to all connected clients (UDP)
                     for client_id, client_addr in list(self.connected_clients.items()):
                         try:
+                            logger.debug(f"Sending frame to {client_id} -> {client_addr}")
                             self.video_socket.sendto(jpeg_bytes, client_addr)
                             frame_count += 1
                             if frame_count % 100 == 0:
-                                logger.info(f"Sent {frame_count} frames to {client_addr}")
+                                logger.info(f"Sent {frame_count} frames (latest to {client_addr})")
                         except Exception as e:
-                            logger.debug(f"Error sending to {client_addr}: {e}")
+                            logger.exception(f"Error sending to {client_addr}: {e}")
 
                     # Petit délai pour éviter surcharge (optionnel, ajustable)
                     time.sleep(0.01)
