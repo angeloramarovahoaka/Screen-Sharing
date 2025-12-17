@@ -6,6 +6,7 @@ import os
 # --- CONFIGURATION RÉSEAU ---
 VIDEO_PORT = 9999
 COMMAND_PORT = 9998
+DISCOVERY_PORT = 9997  # Port UDP pour la découverte des serveurs actifs
 # Buffer UDP assez grand pour recevoir les frames (max ~65KB pour UDP)
 BUFFER_SIZE = 131072  # 128KB buffer for socket recv
 

@@ -5,13 +5,14 @@ import os
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
     QPushButton, QLabel, QFrame, QSplitter, QMessageBox, QDialog,
-    QLineEdit, QFormLayout, QToolBar, QStatusBar, QApplication
+    QLineEdit, QFormLayout, QToolBar, QStatusBar, QApplication,
+    QListWidget, QListWidgetItem
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont, QAction, QIcon
 
-from .config import app_state
-from .client_module import ScreenClient, MultiScreenClient
+from .config import app_state, COMMAND_PORT, VIDEO_PORT
+from .client_module import ScreenClient, MultiScreenClient, DiscoveryScanner
 from .server_module import ScreenServer
 from .ui_login import LoginWindow, UserInfoWidget
 from .ui_screens import ScreenListWidget, ScreenViewer, ScreenThumbnail
@@ -31,13 +32,16 @@ def _qt_flag_to_int(flag) -> int:
 
 
 class AddScreenDialog(QDialog):
-    """Dialog pour ajouter une nouvelle connexion d'écran"""
+    """Dialog pour ajouter une nouvelle connexion d'écran - avec découverte automatique"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Ajouter un écran")
-        self.setFixedSize(400, 200)
+        self.setWindowTitle("Recevoir un écran partagé")
+        self.setMinimumSize(450, 420)
+        self.selected_server = None
+        self.scanner = DiscoveryScanner()
         self.setup_ui()
+        self._start_scan()
         
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -45,36 +49,123 @@ class AddScreenDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         
         # Titre
-        title = QLabel("🖥️ Connexion à un écran distant")
-        title.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        title = QLabel("🖥️ Écrans partagés disponibles")
+        title.setFont(QFont("Segoe UI", 14, QFont.Bold))
         layout.addWidget(title)
         
-        # Formulaire
-        form_layout = QFormLayout()
+        # Indication
+        self.status_label = QLabel("🔍 Recherche en cours...")
+        self.status_label.setStyleSheet("color: #666; font-style: italic;")
+        layout.addWidget(self.status_label)
         
-        self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Mon PC Bureau")
-        name_label = QLabel("Nom:")
-        form_layout.addRow(name_label, self.name_input)
+        # Liste des serveurs disponibles
+        self.server_list = QListWidget()
+        self.server_list.setMinimumHeight(150)
+        self.server_list.setStyleSheet("""
+            QListWidget {
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                padding: 5px;
+                background: white;
+            }
+            QListWidget::item {
+                padding: 12px;
+                border-bottom: 1px solid #eee;
+                border-radius: 4px;
+            }
+            QListWidget::item:selected {
+                background-color: #e3f2fd;
+                color: #1976D2;
+            }
+            QListWidget::item:hover {
+                background-color: #f5f5f5;
+            }
+        """)
+        self.server_list.itemClicked.connect(self._on_server_selected)
+        self.server_list.itemDoubleClicked.connect(self._on_server_double_clicked)
+        layout.addWidget(self.server_list)
         
+        # Section manuelle (repliable)
+        manual_frame = QFrame()
+        manual_frame.setStyleSheet("QFrame { background: #f9f9f9; border-radius: 8px; padding: 10px; }")
+        manual_layout = QVBoxLayout(manual_frame)
+        manual_layout.setSpacing(8)
+        
+        manual_title = QLabel("📝 Ou entrer l'IP manuellement:")
+        manual_title.setFont(QFont("Segoe UI", 10))
+        manual_title.setStyleSheet("color: #666;")
+        manual_layout.addWidget(manual_title)
+        
+        manual_row = QHBoxLayout()
         self.ip_input = QLineEdit()
         self.ip_input.setPlaceholderText("192.168.1.100")
-        ip_label = QLabel("Adresse IP:")
-        form_layout.addRow(ip_label, self.ip_input)
+        self.ip_input.setMinimumHeight(36)
+        self.ip_input.returnPressed.connect(self._on_manual_connect)
+        manual_row.addWidget(self.ip_input)
         
-        layout.addLayout(form_layout)
+        self.manual_connect_btn = QPushButton("Connecter")
+        self.manual_connect_btn.setMinimumHeight(36)
+        self.manual_connect_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+        """)
+        self.manual_connect_btn.clicked.connect(self._on_manual_connect)
+        manual_row.addWidget(self.manual_connect_btn)
         
-        # Boutons
+        manual_layout.addLayout(manual_row)
+        layout.addWidget(manual_frame)
+        
+        # Boutons du bas
         btn_layout = QHBoxLayout()
+        
+        self.refresh_btn = QPushButton("🔄 Actualiser")
+        self.refresh_btn.clicked.connect(self._start_scan)
+        self.refresh_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f5f5f5;
+                color: #333;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                padding: 10px 20px;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+        """)
+        btn_layout.addWidget(self.refresh_btn)
+        
+        btn_layout.addStretch()
         
         cancel_btn = QPushButton("Annuler")
         cancel_btn.clicked.connect(self.reject)
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f5f5f5;
+                color: #333;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                padding: 10px 20px;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+        """)
         btn_layout.addWidget(cancel_btn)
         
-        connect_btn = QPushButton("Connecter")
-        connect_btn.setStyleSheet("""
+        self.connect_btn = QPushButton("Se connecter")
+        self.connect_btn.setEnabled(False)
+        self.connect_btn.setStyleSheet("""
             QPushButton {
-                background-color: #2196F3;
+                background-color: #4CAF50;
                 color: white;
                 border: none;
                 border-radius: 5px;
@@ -82,16 +173,88 @@ class AddScreenDialog(QDialog):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #1976D2;
+                background-color: #43A047;
+            }
+            QPushButton:disabled {
+                background-color: #ccc;
+                color: #888;
             }
         """)
-        connect_btn.clicked.connect(self.accept)
-        btn_layout.addWidget(connect_btn)
+        self.connect_btn.clicked.connect(self._on_connect_clicked)
+        btn_layout.addWidget(self.connect_btn)
         
         layout.addLayout(btn_layout)
         
+        # Connecter les signaux du scanner
+        self.scanner.server_found.connect(self._on_server_found)
+        self.scanner.scan_finished.connect(self._on_scan_finished)
+        
+    def _start_scan(self):
+        """Lance le scan des serveurs"""
+        self.server_list.clear()
+        self.selected_server = None
+        self.connect_btn.setEnabled(False)
+        self.status_label.setText("🔍 Recherche en cours...")
+        self.status_label.setStyleSheet("color: #666; font-style: italic;")
+        self.refresh_btn.setEnabled(False)
+        self.scanner.start_scan(duration=3.0)
+        
+    def _on_server_found(self, server_info):
+        """Appelé quand un serveur est trouvé"""
+        item = QListWidgetItem()
+        item.setText(f"🖥️ {server_info['name']}\n     📍 {server_info['ip']}")
+        item.setData(Qt.UserRole, server_info)
+        self.server_list.addItem(item)
+        
+        # Mettre à jour le statut
+        count = self.server_list.count()
+        self.status_label.setText(f"✅ {count} écran(s) trouvé(s)")
+        self.status_label.setStyleSheet("color: #4CAF50;")
+        
+    def _on_scan_finished(self):
+        """Appelé quand le scan est terminé"""
+        self.refresh_btn.setEnabled(True)
+        if self.server_list.count() == 0:
+            self.status_label.setText("❌ Aucun écran partagé trouvé sur le réseau")
+            self.status_label.setStyleSheet("color: #f44336;")
+        
+    def _on_server_selected(self, item):
+        """Appelé quand un serveur est sélectionné"""
+        self.selected_server = item.data(Qt.UserRole)
+        self.connect_btn.setEnabled(True)
+        
+    def _on_server_double_clicked(self, item):
+        """Double-clic = sélection + connexion"""
+        self.selected_server = item.data(Qt.UserRole)
+        self.accept()
+        
+    def _on_connect_clicked(self):
+        """Bouton connecter cliqué"""
+        if self.selected_server:
+            self.accept()
+            
+    def _on_manual_connect(self):
+        """Connexion manuelle via IP"""
+        ip = self.ip_input.text().strip()
+        if ip:
+            self.selected_server = {
+                'name': ip,  # Utiliser l'IP comme nom par défaut
+                'ip': ip,
+                'port': COMMAND_PORT,
+                'video_port': VIDEO_PORT
+            }
+            self.accept()
+        
     def get_values(self):
-        return self.name_input.text().strip(), self.ip_input.text().strip()
+        """Retourne (name, ip) du serveur sélectionné"""
+        if self.selected_server:
+            return self.selected_server['name'], self.selected_server['ip']
+        return None, None
+    
+    def closeEvent(self, event):
+        """Arrête le scanner à la fermeture"""
+        self.scanner.stop_scan()
+        super().closeEvent(event)
 
 
 class MainWindow(QMainWindow):

@@ -29,7 +29,7 @@ try:
 except ImportError:
     from PIL import ImageGrab
 
-from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, JPEG_QUALITY, DEFAULT_WIDTH
+from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, JPEG_QUALITY, DEFAULT_WIDTH, DISCOVERY_PORT
 # Safe maximum UDP payload size (bytes). Keep comfortably under 65507 and typical MTU.
 MAX_UDP_PAYLOAD = 60000
 
@@ -114,6 +114,11 @@ class ScreenServer(QObject):
         # Active TCP command connections (for server -> client notifications)
         self._command_conns: Dict[str, socket.socket] = {}
         self._command_conns_lock = threading.Lock()
+        
+        # Discovery / annonce sur le réseau
+        self._discovery_socket = None
+        self._discovery_thread = None
+        self._sharer_name = None  # Nom affiché pour les autres clients
         
         # Mapping des boutons souris
         self.button_map = {
@@ -219,14 +224,16 @@ class ScreenServer(QObject):
         # Sinon, retourner le caractère tel quel (pour les lettres, chiffres, etc.)
         return key_name
             
-    def start(self, client_ip=None):
+    def start(self, client_ip=None, sharer_name=None):
         """Démarre le serveur (écoute commandes seulement, pas de streaming auto)
         
         Args:
             client_ip: (Optionnel) IP d'un client initial. Si None, le serveur
                       attend que les clients s'enregistrent via TCP.
+            sharer_name: (Optionnel) Nom affiché pour la découverte réseau
         """
         self.client_ip = client_ip
+        self._sharer_name = sharer_name or self._get_hostname()
         self.is_running = True
         
         # Si une IP client est fournie, l'ajouter (compatibilité arrière)
@@ -245,6 +252,24 @@ class ScreenServer(QObject):
         
         self.status_changed.emit("Serveur démarré (prêt pour streaming)")
         logger.info("Serveur démarré - en attente de demande de streaming")
+    
+    def _get_hostname(self):
+        """Récupère le nom de la machine"""
+        try:
+            return socket.gethostname()
+        except Exception:
+            return "Unknown"
+    
+    def _get_local_ip(self):
+        """Récupère l'adresse IP locale"""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "127.0.0.1"
         
     def start_streaming(self):
         """Démarre le streaming vidéo (sur demande)"""
@@ -255,6 +280,10 @@ class ScreenServer(QObject):
         self.is_streaming = True
         self.video_thread = threading.Thread(target=self._video_streamer, daemon=True)
         self.video_thread.start()
+        
+        # Démarrer l'annonce de découverte sur le réseau
+        self._start_discovery_broadcast()
+        
         self.status_changed.emit("Streaming vidéo démarré")
         logger.info("Video streaming started on demand")
 
@@ -264,6 +293,10 @@ class ScreenServer(QObject):
     def stop_streaming(self):
         """Arrête le streaming vidéo"""
         self.is_streaming = False
+        
+        # Arrêter l'annonce de découverte
+        self._stop_discovery_broadcast()
+        
         if self.video_socket:
             try:
                 self.video_socket.close()
@@ -275,6 +308,68 @@ class ScreenServer(QObject):
 
         # Notify viewers (best-effort)
         self._broadcast_control({"type": "stream", "state": "stopped"})
+    
+    def _start_discovery_broadcast(self):
+        """Démarre le broadcast UDP pour annoncer ce serveur sur le réseau"""
+        if self._discovery_thread and self._discovery_thread.is_alive():
+            return
+            
+        self._discovery_thread = threading.Thread(target=self._discovery_broadcaster, daemon=True)
+        self._discovery_thread.start()
+        logger.info("Discovery broadcast started")
+    
+    def _stop_discovery_broadcast(self):
+        """Arrête le broadcast de découverte"""
+        if self._discovery_socket:
+            try:
+                self._discovery_socket.close()
+            except Exception:
+                pass
+            self._discovery_socket = None
+        logger.info("Discovery broadcast stopped")
+    
+    def _discovery_broadcaster(self):
+        """Thread qui envoie périodiquement un message d'annonce sur le réseau"""
+        try:
+            self._discovery_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self._discovery_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            self._discovery_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            
+            local_ip = self._get_local_ip()
+            
+            while self.is_streaming and self.is_running:
+                try:
+                    # Message d'annonce JSON
+                    announcement = json.dumps({
+                        "type": "screen_share_announcement",
+                        "name": self._sharer_name,
+                        "ip": local_ip,
+                        "port": COMMAND_PORT,
+                        "video_port": VIDEO_PORT
+                    })
+                    
+                    # Envoyer en broadcast
+                    self._discovery_socket.sendto(
+                        announcement.encode('utf-8'),
+                        ('<broadcast>', DISCOVERY_PORT)
+                    )
+                    logger.debug(f"Sent discovery broadcast: {announcement}")
+                    
+                except Exception as e:
+                    logger.debug(f"Discovery broadcast error: {e}")
+                
+                # Attendre 2 secondes avant le prochain broadcast
+                time.sleep(2)
+                
+        except Exception as e:
+            logger.exception(f"Discovery broadcaster error: {e}")
+        finally:
+            if self._discovery_socket:
+                try:
+                    self._discovery_socket.close()
+                except Exception:
+                    pass
+                self._discovery_socket = None
 
     def _broadcast_control(self, message: dict):
         """Envoie un message JSON (ligne) à tous les clients connectés (best-effort)."""
