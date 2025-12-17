@@ -24,10 +24,7 @@ if platform.system() == 'Windows':
     import ctypes
     from ctypes import wintypes
 
-try:
-    import pyscreenshot as ImageGrab
-except ImportError:
-    from PIL import ImageGrab
+import mss
 
 from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, JPEG_QUALITY, DEFAULT_WIDTH, DISCOVERY_PORT
 # Safe maximum UDP payload size (bytes). Keep comfortably under 65507 and typical MTU.
@@ -428,28 +425,34 @@ class ScreenServer(QObject):
         logger.info("Serveur arrêté (signals emitted)")
         
     def _video_streamer(self):
-        """Thread de streaming vidéo"""
+        """Thread de streaming vidéo - utilise mss pour éviter le flash sur Linux"""
+        sct = None
         try:
             self.video_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.status_changed.emit("Streaming vidéo démarré")
             logger.info("Video streamer thread started")
             
-            # Use screen capture for video streaming (webcam support removed)
-            vid = None
-            logger.info("Using screen capture for video streaming")
+            # Initialiser mss pour la capture d'écran (pas de flash sur Linux)
+            sct = mss.mss()
+            # monitors[0] = tous les écrans combinés, monitors[1] = écran principal
+            monitor = sct.monitors[1]
+            logger.info(f"Using mss screen capture (monitor: {monitor['width']}x{monitor['height']})")
             
             frame_count = 0
             last_log_time = time.time()
 
             while self.is_running and self.is_streaming:
                 try:
-                    # Capture screen frame
-                    img_pil = ImageGrab.grab()
-                    frame = np.array(img_pil, dtype=np.uint8)
-                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    # Capture screen frame avec mss (pas de subprocess, pas de flash)
+                    sct_img = sct.grab(monitor)
+                    
+                    # mss retourne BGRA, convertir en numpy array et garder BGR (drop alpha)
+                    frame = np.array(sct_img, dtype=np.uint8)
+                    frame = frame[:, :, :3]  # BGRA -> BGR (supprimer le canal alpha)
+                    
                     frame = imutils.resize(frame, width=DEFAULT_WIDTH)
 
-                    # Encode JPEG (simple comme server-with-cam.py)
+                    # Encode JPEG
                     encode_params = [
                         cv2.IMWRITE_JPEG_QUALITY,
                         int(JPEG_QUALITY),
@@ -547,6 +550,12 @@ class ScreenServer(QObject):
             self.error_occurred.emit(f"Erreur vidéo: {e}")
             logger.exception(f"Video streamer fatal error: {e}")
         finally:
+            # Fermer l'instance mss proprement
+            if sct:
+                try:
+                    sct.close()
+                except Exception:
+                    pass
             if self.video_socket:
                 self.video_socket.close()
                 
