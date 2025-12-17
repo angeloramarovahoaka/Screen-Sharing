@@ -857,14 +857,21 @@ class ScreenListWidget(QWidget):
         
     def setup_ui(self):
         """Configure l'interface"""
+        # Style explicite pour le widget principal - fond clair
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #ffffff;
+            }
+        """)
+        
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         
         # Titre
         title = QLabel("📺 Écrans connectés")
         title.setFont(QFont("Segoe UI", 12, QFont.Bold))
-        # Texte foncé pour contraste sur fond clair (comme le nom d'utilisateur)
-        title.setStyleSheet("color: #111111;")
+        # Texte foncé pour contraste sur fond clair
+        title.setStyleSheet("color: #111111; background-color: transparent;")
         layout.addWidget(title)
         
         # Zone de scroll pour les miniatures
@@ -874,11 +881,15 @@ class ScreenListWidget(QWidget):
         scroll.setStyleSheet("""
             QScrollArea {
                 border: none;
-                background-color: transparent;
+                background-color: #ffffff;
+            }
+            QScrollArea > QWidget > QWidget {
+                background-color: #ffffff;
             }
         """)
         
         self.grid_widget = QWidget()
+        self.grid_widget.setStyleSheet("background-color: #ffffff;")
         self.grid_layout = QGridLayout(self.grid_widget)
         self.grid_layout.setSpacing(10)
         self.grid_layout.setAlignment(Qt.AlignTop | Qt.AlignLeft)
@@ -889,7 +900,7 @@ class ScreenListWidget(QWidget):
         # Message si aucun écran
         self.empty_label = QLabel("Aucun écran connecté.\nCliquez sur 'Ajouter' pour vous connecter à un serveur.")
         self.empty_label.setAlignment(Qt.AlignCenter)
-        self.empty_label.setStyleSheet("color: #999; padding: 50px;")
+        self.empty_label.setStyleSheet("color: #888888; padding: 50px; background-color: transparent;")
         layout.addWidget(self.empty_label)
         
     def add_screen(self, screen_id, screen_name):

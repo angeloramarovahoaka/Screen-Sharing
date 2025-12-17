@@ -41,34 +41,44 @@ class AddScreenDialog(QDialog):
         self.selected_server = None
         self.scanner = DiscoveryScanner()
         self.setup_ui()
+        self._apply_style()
         self._start_scan()
-        
-    def setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        layout.setContentsMargins(20, 20, 20, 20)
-        
-        # Titre
-        title = QLabel("🖥️ Écrans partagés disponibles")
-        title.setFont(QFont("Segoe UI", 14, QFont.Bold))
-        layout.addWidget(title)
-        
-        # Indication
-        self.status_label = QLabel("🔍 Recherche en cours...")
-        self.status_label.setStyleSheet("color: #666; font-style: italic;")
-        layout.addWidget(self.status_label)
-        
-        # Liste des serveurs disponibles
-        self.server_list = QListWidget()
-        self.server_list.setMinimumHeight(150)
-        self.server_list.setStyleSheet("""
+    
+    def _apply_style(self):
+        """Applique un style explicite pour supporter le mode sombre"""
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #ffffff;
+                color: #333333;
+            }
+            QLabel {
+                color: #333333;
+                background: transparent;
+            }
+            QLineEdit {
+                background-color: #ffffff;
+                color: #333333;
+                border: 2px solid #ddd;
+                border-radius: 6px;
+                padding: 8px 12px;
+                font-size: 13px;
+            }
+            QLineEdit:focus {
+                border-color: #2196F3;
+            }
+            QLineEdit::placeholder {
+                color: #999999;
+            }
             QListWidget {
+                background-color: #ffffff;
+                color: #333333;
                 border: 1px solid #ddd;
                 border-radius: 8px;
                 padding: 5px;
-                background: white;
             }
             QListWidget::item {
+                background-color: #ffffff;
+                color: #333333;
                 padding: 12px;
                 border-bottom: 1px solid #eee;
                 border-radius: 4px;
@@ -80,42 +90,73 @@ class AddScreenDialog(QDialog):
             QListWidget::item:hover {
                 background-color: #f5f5f5;
             }
+            QFrame#manualFrame {
+                background-color: #f5f5f5;
+                border-radius: 8px;
+                border: 1px solid #e0e0e0;
+            }
         """)
+        
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Titre
+        title = QLabel("🖥️ Écrans partagés disponibles")
+        title.setFont(QFont("Segoe UI", 14, QFont.Bold))
+        title.setStyleSheet("color: #1976D2; background: transparent;")
+        layout.addWidget(title)
+        
+        # Indication
+        self.status_label = QLabel("🔍 Recherche en cours...")
+        self.status_label.setStyleSheet("color: #666666; font-style: italic; background: transparent;")
+        layout.addWidget(self.status_label)
+        
+        # Liste des serveurs disponibles
+        self.server_list = QListWidget()
+        self.server_list.setMinimumHeight(150)
         self.server_list.itemClicked.connect(self._on_server_selected)
         self.server_list.itemDoubleClicked.connect(self._on_server_double_clicked)
         layout.addWidget(self.server_list)
         
-        # Section manuelle (repliable)
+        # Section manuelle
         manual_frame = QFrame()
-        manual_frame.setStyleSheet("QFrame { background: #f9f9f9; border-radius: 8px; padding: 10px; }")
+        manual_frame.setObjectName("manualFrame")
         manual_layout = QVBoxLayout(manual_frame)
-        manual_layout.setSpacing(8)
+        manual_layout.setSpacing(10)
+        manual_layout.setContentsMargins(12, 12, 12, 12)
         
         manual_title = QLabel("📝 Ou entrer l'IP manuellement:")
         manual_title.setFont(QFont("Segoe UI", 10))
-        manual_title.setStyleSheet("color: #666;")
+        manual_title.setStyleSheet("color: #555555; background: transparent;")
         manual_layout.addWidget(manual_title)
         
         manual_row = QHBoxLayout()
         self.ip_input = QLineEdit()
         self.ip_input.setPlaceholderText("192.168.1.100")
-        self.ip_input.setMinimumHeight(36)
+        self.ip_input.setMinimumHeight(38)
         self.ip_input.returnPressed.connect(self._on_manual_connect)
         manual_row.addWidget(self.ip_input)
         
         self.manual_connect_btn = QPushButton("Connecter")
-        self.manual_connect_btn.setMinimumHeight(36)
+        self.manual_connect_btn.setMinimumHeight(38)
+        self.manual_connect_btn.setCursor(Qt.PointingHandCursor)
         self.manual_connect_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
-                color: white;
+                color: #ffffff;
                 border: none;
-                border-radius: 5px;
-                padding: 8px 16px;
+                border-radius: 6px;
+                padding: 10px 18px;
                 font-weight: bold;
+                font-size: 13px;
             }
             QPushButton:hover {
                 background-color: #1976D2;
+            }
+            QPushButton:pressed {
+                background-color: #1565C0;
             }
         """)
         self.manual_connect_btn.clicked.connect(self._on_manual_connect)
@@ -128,17 +169,23 @@ class AddScreenDialog(QDialog):
         btn_layout = QHBoxLayout()
         
         self.refresh_btn = QPushButton("🔄 Actualiser")
+        self.refresh_btn.setCursor(Qt.PointingHandCursor)
         self.refresh_btn.clicked.connect(self._start_scan)
         self.refresh_btn.setStyleSheet("""
             QPushButton {
-                background-color: #f5f5f5;
-                color: #333;
-                border: 1px solid #ddd;
-                border-radius: 5px;
-                padding: 10px 20px;
+                background-color: #f0f0f0;
+                color: #333333;
+                border: 1px solid #cccccc;
+                border-radius: 6px;
+                padding: 10px 18px;
+                font-size: 13px;
             }
             QPushButton:hover {
                 background-color: #e0e0e0;
+            }
+            QPushButton:disabled {
+                background-color: #f5f5f5;
+                color: #999999;
             }
         """)
         btn_layout.addWidget(self.refresh_btn)
@@ -146,14 +193,16 @@ class AddScreenDialog(QDialog):
         btn_layout.addStretch()
         
         cancel_btn = QPushButton("Annuler")
+        cancel_btn.setCursor(Qt.PointingHandCursor)
         cancel_btn.clicked.connect(self.reject)
         cancel_btn.setStyleSheet("""
             QPushButton {
-                background-color: #f5f5f5;
-                color: #333;
-                border: 1px solid #ddd;
-                border-radius: 5px;
-                padding: 10px 20px;
+                background-color: #f0f0f0;
+                color: #333333;
+                border: 1px solid #cccccc;
+                border-radius: 6px;
+                padding: 10px 18px;
+                font-size: 13px;
             }
             QPushButton:hover {
                 background-color: #e0e0e0;
@@ -162,22 +211,27 @@ class AddScreenDialog(QDialog):
         btn_layout.addWidget(cancel_btn)
         
         self.connect_btn = QPushButton("Se connecter")
+        self.connect_btn.setCursor(Qt.PointingHandCursor)
         self.connect_btn.setEnabled(False)
         self.connect_btn.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
-                color: white;
+                color: #ffffff;
                 border: none;
-                border-radius: 5px;
+                border-radius: 6px;
                 padding: 10px 20px;
                 font-weight: bold;
+                font-size: 13px;
             }
             QPushButton:hover {
                 background-color: #43A047;
             }
+            QPushButton:pressed {
+                background-color: #388E3C;
+            }
             QPushButton:disabled {
-                background-color: #ccc;
-                color: #888;
+                background-color: #cccccc;
+                color: #888888;
             }
         """)
         self.connect_btn.clicked.connect(self._on_connect_clicked)
@@ -195,7 +249,7 @@ class AddScreenDialog(QDialog):
         self.selected_server = None
         self.connect_btn.setEnabled(False)
         self.status_label.setText("🔍 Recherche en cours...")
-        self.status_label.setStyleSheet("color: #666; font-style: italic;")
+        self.status_label.setStyleSheet("color: #666666; font-style: italic; background: transparent;")
         self.refresh_btn.setEnabled(False)
         self.scanner.start_scan(duration=3.0)
         
@@ -209,14 +263,14 @@ class AddScreenDialog(QDialog):
         # Mettre à jour le statut
         count = self.server_list.count()
         self.status_label.setText(f"✅ {count} écran(s) trouvé(s)")
-        self.status_label.setStyleSheet("color: #4CAF50;")
+        self.status_label.setStyleSheet("color: #4CAF50; font-weight: bold; background: transparent;")
         
     def _on_scan_finished(self):
         """Appelé quand le scan est terminé"""
         self.refresh_btn.setEnabled(True)
         if self.server_list.count() == 0:
             self.status_label.setText("❌ Aucun écran partagé trouvé sur le réseau")
-            self.status_label.setStyleSheet("color: #f44336;")
+            self.status_label.setStyleSheet("color: #f44336; background: transparent;")
         
     def _on_server_selected(self, item):
         """Appelé quand un serveur est sélectionné"""
