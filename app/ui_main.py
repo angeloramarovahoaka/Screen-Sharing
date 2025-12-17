@@ -516,46 +516,34 @@ class MainWindow(QMainWindow):
             self.toast.show_toast("Partage arrêté", kind="info")
             self._refresh_app_status()
         else:
-            # Demander l'IP du client
-            dialog = QDialog(self)
-            dialog.setWindowTitle("Partager l'écran")
-            layout = QVBoxLayout(dialog)
+            # Démarrer directement le serveur — les clients s'enregistrent automatiquement via TCP
+            # Plus besoin de demander l'IP du client
             
-            label = QLabel("Adresse IP du client qui recevra le flux:")
-            layout.addWidget(label)
+            # Démarrer le serveur si pas encore lancé
+            if not self.server.is_running:
+                self.server.start()  # Démarrer sans IP spécifique
             
-            ip_input = QLineEdit()
-            ip_input.setPlaceholderText("192.168.1.100")
-            layout.addWidget(ip_input)
+            # Démarrer le streaming vidéo
+            self.server.start_streaming()
+            self.share_screen_btn.setText("🛑 Arrêter le partage")
+            self.share_screen_btn.setStyleSheet(button_solid(THEME.danger, THEME.danger_hover, padding="11px 18px"))
             
-            # NOTE: webcam option removed from UI — server uses default `USE_WEBCAM` from config
-            
-            btn_layout = QHBoxLayout()
-            cancel_btn = QPushButton("Annuler")
-            cancel_btn.clicked.connect(dialog.reject)
-            btn_layout.addWidget(cancel_btn)
-            
-            start_btn = QPushButton("Démarrer")
-            start_btn.clicked.connect(dialog.accept)
-            btn_layout.addWidget(start_btn)
-            layout.addLayout(btn_layout)
-            
-            if dialog.exec() == QDialog.Accepted:
-                client_ip = ip_input.text().strip()
-                if client_ip:
-                    # Use server default for webcam (config / run_server flags)
-                    self.server.add_client(client_ip)
-                    # Démarrer le serveur si pas encore lancé
-                    if not self.server.is_running:
-                        self.server.start(client_ip)
-                    # Démarrer le streaming vidéo
-                    self.server.start_streaming()
-                    self.share_screen_btn.setText("🛑 Arrêter le partage")
-                    self.share_screen_btn.setStyleSheet(button_solid(THEME.danger, THEME.danger_hover, padding="11px 18px"))
-                    self.toast.show_toast(f"Streaming démarré vers {client_ip}", kind="success")
-                    self._refresh_app_status()
-                    
-    # Call UI removed
+            # Afficher l'IP locale pour que les autres puissent se connecter
+            local_ip = self._get_local_ip()
+            self.toast.show_toast(f"Partage démarré • IP: {local_ip}", kind="success", duration=5000)
+            self._refresh_app_status()
+    
+    def _get_local_ip(self):
+        """Récupère l'adresse IP locale de la machine"""
+        try:
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "127.0.0.1"
         
     def _on_screen_selected(self, screen_id):
         """Callback quand un écran est sélectionné"""

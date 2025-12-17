@@ -219,11 +219,22 @@ class ScreenServer(QObject):
         # Sinon, retourner le caractère tel quel (pour les lettres, chiffres, etc.)
         return key_name
             
-    def start(self, client_ip):
-        """Démarre le serveur (écoute commandes seulement, pas de streaming auto)"""
+    def start(self, client_ip=None):
+        """Démarre le serveur (écoute commandes seulement, pas de streaming auto)
+        
+        Args:
+            client_ip: (Optionnel) IP d'un client initial. Si None, le serveur
+                      attend que les clients s'enregistrent via TCP.
+        """
         self.client_ip = client_ip
         self.is_running = True
-        logger.info(f"Starting ScreenServer for client {client_ip}")
+        
+        # Si une IP client est fournie, l'ajouter (compatibilité arrière)
+        if client_ip:
+            self.add_client(client_ip)
+            logger.info(f"Starting ScreenServer for client {client_ip}")
+        else:
+            logger.info("Starting ScreenServer (waiting for clients to register via TCP)")
         
         # Démarrer le thread des commandes
         self.command_thread = threading.Thread(target=self._command_listener, daemon=True)
