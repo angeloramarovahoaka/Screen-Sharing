@@ -97,9 +97,9 @@ class ScreenServer(QObject):
         self.mouse = MouseController()
         self.keyboard = KeyboardController()
         
-        # Résolution d'écran (à ajuster selon votre écran)
-        self.screen_width = 1920
-        self.screen_height = 1080
+        # Résolution d'écran (détection automatique)
+        self.screen_width, self.screen_height = self._detect_screen_resolution()
+        logger.info(f"Detected screen resolution: {self.screen_width}x{self.screen_height}")
         
         # État
         self.is_running = False
@@ -142,6 +142,45 @@ class ScreenServer(QObject):
             self.VK_RIGHT = 0x27
             self.VK_DOWN = 0x28
             self.KEYEVENTF_KEYUP = 0x0002
+    
+    def _detect_screen_resolution(self):
+        """Détecte automatiquement la résolution de l'écran"""
+        try:
+            # Méthode 1: Utiliser mss (rapide et fiable)
+            with mss.mss() as sct:
+                monitor = sct.monitors[1]  # Premier écran (0 = tous les écrans combinés)
+                return monitor['width'], monitor['height']
+        except Exception as e:
+            logger.warning(f"mss screen detection failed: {e}")
+        
+        try:
+            # Méthode 2: Utiliser xrandr sur Linux
+            if platform.system() == 'Linux':
+                import subprocess
+                result = subprocess.run(['xrandr'], capture_output=True, text=True)
+                for line in result.stdout.split('\n'):
+                    if '*' in line:  # Résolution active
+                        # Format: "   1920x1080     60.00*+"
+                        parts = line.split()
+                        if parts:
+                            res = parts[0]
+                            if 'x' in res:
+                                w, h = res.split('x')
+                                return int(w), int(h)
+        except Exception as e:
+            logger.warning(f"xrandr screen detection failed: {e}")
+        
+        try:
+            # Méthode 3: Utiliser ctypes sur Windows
+            if platform.system() == 'Windows':
+                user32 = ctypes.windll.user32
+                return user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+        except Exception as e:
+            logger.warning(f"Windows screen detection failed: {e}")
+        
+        # Fallback: valeurs par défaut
+        logger.warning("Using default screen resolution 1920x1080")
+        return 1920, 1080
     
     def _press_arrow_key(self, direction):
         """Appuie sur une touche directionnelle en utilisant l'API Windows native"""
