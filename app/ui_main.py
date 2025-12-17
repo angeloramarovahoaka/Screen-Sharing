@@ -311,6 +311,135 @@ class AddScreenDialog(QDialog):
         super().closeEvent(event)
 
 
+class ShareModeDialog(QDialog):
+    """Dialog pour choisir le mode de partage d'écran"""
+    
+    # Constantes pour les modes
+    MODE_DESKTOP = "desktop"
+    MODE_WINDOW = "window"
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Mode de partage")
+        self.setMinimumSize(400, 250)
+        self.selected_mode = None
+        self.setup_ui()
+        self._apply_style()
+        
+    def _apply_style(self):
+        """Applique un style explicite"""
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #ffffff;
+                color: #333333;
+            }
+            QLabel {
+                color: #333333;
+                background: transparent;
+            }
+            QPushButton {
+                min-height: 60px;
+                font-size: 14px;
+                border-radius: 8px;
+                padding: 15px;
+            }
+        """)
+        
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(20)
+        layout.setContentsMargins(25, 25, 25, 25)
+        
+        # Titre
+        title = QLabel("🖥️ Que souhaitez-vous partager ?")
+        title.setFont(QFont("Segoe UI", 14, QFont.Bold))
+        title.setStyleSheet("color: #1976D2; background: transparent;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+        
+        # Description
+        desc = QLabel("Choisissez ce que vous voulez partager avec les autres participants.")
+        desc.setStyleSheet("color: #666666; background: transparent;")
+        desc.setAlignment(Qt.AlignCenter)
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+        
+        layout.addSpacing(10)
+        
+        # Bouton Bureau entier
+        self.desktop_btn = QPushButton("🖥️ Tout le bureau\nPartager l'écran complet")
+        self.desktop_btn.setCursor(Qt.PointingHandCursor)
+        self.desktop_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: #ffffff;
+                border: none;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+            QPushButton:pressed {
+                background-color: #1565C0;
+            }
+        """)
+        self.desktop_btn.clicked.connect(self._select_desktop)
+        layout.addWidget(self.desktop_btn)
+        
+        # Bouton Fenêtre principale
+        self.window_btn = QPushButton("📱 Fenêtre principale uniquement\nPartager seulement cette application")
+        self.window_btn.setCursor(Qt.PointingHandCursor)
+        self.window_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: #ffffff;
+                border: none;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #43A047;
+            }
+            QPushButton:pressed {
+                background-color: #388E3C;
+            }
+        """)
+        self.window_btn.clicked.connect(self._select_window)
+        layout.addWidget(self.window_btn)
+        
+        layout.addSpacing(10)
+        
+        # Bouton Annuler
+        cancel_btn = QPushButton("Annuler")
+        cancel_btn.setCursor(Qt.PointingHandCursor)
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f0f0f0;
+                color: #333333;
+                border: 1px solid #cccccc;
+                min-height: 40px;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        layout.addWidget(cancel_btn)
+        
+    def _select_desktop(self):
+        """Sélectionne le mode bureau entier"""
+        self.selected_mode = self.MODE_DESKTOP
+        self.accept()
+        
+    def _select_window(self):
+        """Sélectionne le mode fenêtre uniquement"""
+        self.selected_mode = self.MODE_WINDOW
+        self.accept()
+        
+    def get_mode(self):
+        """Retourne le mode sélectionné"""
+        return self.selected_mode
+
+
 class MainWindow(QMainWindow):
     """
     Fenêtre principale de l'application Screen Sharing
@@ -733,21 +862,29 @@ class MainWindow(QMainWindow):
             self.toast.show_toast("Partage arrêté", kind="info")
             self._refresh_app_status()
         else:
-            # Démarrer directement le serveur — les clients s'enregistrent automatiquement via TCP
-            # Plus besoin de demander l'IP du client
+            # Afficher le dialog de choix du mode de partage
+            dialog = ShareModeDialog(self)
+            if dialog.exec() != QDialog.Accepted:
+                return  # L'utilisateur a annulé
+            
+            share_mode = dialog.get_mode()
             
             # Démarrer le serveur si pas encore lancé
             if not self.server.is_running:
                 self.server.start()  # Démarrer sans IP spécifique
+            
+            # Configurer le mode de capture
+            self.server.set_capture_mode(share_mode)
             
             # Démarrer le streaming vidéo
             self.server.start_streaming()
             self.share_screen_btn.setText("🛑 Arrêter le partage")
             self.share_screen_btn.setStyleSheet(button_solid(THEME.danger, THEME.danger_hover, padding="11px 18px"))
             
-            # Afficher l'IP locale pour que les autres puissent se connecter
+            # Afficher l'IP locale et le mode
             local_ip = self._get_local_ip()
-            self.toast.show_toast(f"Partage démarré • IP: {local_ip}", kind="success", duration_ms=5000)
+            mode_text = "Bureau entier" if share_mode == ShareModeDialog.MODE_DESKTOP else "Fenêtre principale"
+            self.toast.show_toast(f"Partage démarré ({mode_text}) • IP: {local_ip}", kind="success", duration_ms=5000)
             self._refresh_app_status()
     
     def _get_local_ip(self):

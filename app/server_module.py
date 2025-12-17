@@ -108,6 +108,10 @@ class ScreenServer(QObject):
         # Track pressed modifiers for combos initiated from clients
         self._pressed_modifiers = set()
         
+        # Mode de capture: "desktop" (tout l'écran) ou "window" (fenêtre principale)
+        self.capture_mode = "desktop"
+        self._main_window = None  # Référence à la fenêtre principale pour le mode window
+        
         # Configuration
         # Camera/webcam support removed — always use screen capture
         
@@ -181,6 +185,18 @@ class ScreenServer(QObject):
         # Fallback: valeurs par défaut
         logger.warning("Using default screen resolution 1920x1080")
         return 1920, 1080
+    
+    def set_capture_mode(self, mode, main_window=None):
+        """Définit le mode de capture d'écran
+        
+        Args:
+            mode: "desktop" pour tout l'écran, "window" pour la fenêtre principale uniquement
+            main_window: Référence à la fenêtre principale (nécessaire pour le mode "window")
+        """
+        self.capture_mode = mode
+        if main_window:
+            self._main_window = main_window
+        logger.info(f"Capture mode set to: {mode}")
     
     def _press_arrow_key(self, direction):
         """Appuie sur une touche directionnelle en utilisant l'API Windows native"""
