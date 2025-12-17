@@ -8,8 +8,9 @@ opencv-python>=4.8.0
 numpy>=1.24.0
 imutils>=0.5.4
 
-# Capture d'écran (mss pour éviter le flash sur Linux)
+# Capture d'écran (mss pour éviter le flash sur Linux, pyscreenshot comme fallback)
 mss>=10.0.0
+pyscreenshot>=3.1
 Pillow>=10.0.0
 
 # Contrôle clavier/souris

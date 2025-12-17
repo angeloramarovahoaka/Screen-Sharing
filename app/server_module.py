@@ -26,6 +26,17 @@ if platform.system() == 'Windows':
 
 import mss
 
+# Fallback pour la capture d'écran si mss échoue (certains systèmes Linux)
+try:
+    import pyscreenshot as ImageGrab
+    _HAS_PYSCREENSHOT = True
+except ImportError:
+    _HAS_PYSCREENSHOT = False
+    try:
+        from PIL import ImageGrab
+    except ImportError:
+        ImageGrab = None
+
 from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, JPEG_QUALITY, DEFAULT_WIDTH, DISCOVERY_PORT
 # Safe maximum UDP payload size (bytes). Keep comfortably under 65507 and typical MTU.
 MAX_UDP_PAYLOAD = 60000
@@ -423,49 +434,96 @@ class ScreenServer(QObject):
                 
         self.status_changed.emit("Serveur arrêté")
         logger.info("Serveur arrêté (signals emitted)")
+    
+    def _capture_screen_mss(self, sct, monitor):
+        """Capture d'écran via mss (rapide, pas de flash)"""
+        sct_img = sct.grab(monitor)
+        frame = np.array(sct_img, dtype=np.uint8)
+        # mss retourne BGRA, garder BGR
+        if frame.ndim == 3 and frame.shape[2] == 4:
+            frame = frame[:, :, :3]
+        return frame
+    
+    def _capture_screen_pil(self):
+        """Capture d'écran via PIL/pyscreenshot (fallback, peut causer un flash sur Linux)"""
+        if ImageGrab is None:
+            raise RuntimeError("No screen capture backend available")
+        img_pil = ImageGrab.grab()
+        frame = np.array(img_pil, dtype=np.uint8)
+        # PIL retourne RGB, convertir en BGR pour OpenCV
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        return frame
         
     def _video_streamer(self):
-        """Thread de streaming vidéo - utilise mss pour éviter le flash sur Linux"""
+        """Thread de streaming vidéo - avec fallback automatique si mss échoue"""
         sct = None
+        use_mss = True  # Essayer mss d'abord
+        mss_fail_count = 0
+        MAX_MSS_FAILURES = 3  # Après 3 échecs consécutifs, basculer vers PIL
+        
         try:
             self.video_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.status_changed.emit("Streaming vidéo démarré")
             logger.info("Video streamer thread started")
             
-            # Initialiser mss pour la capture d'écran (pas de flash sur Linux)
-            sct = mss.mss()
-            # monitors[0] = tous les écrans combinés, monitors[1] = écran principal
-            monitor = sct.monitors[1]
-            logger.info(f"Using mss screen capture (monitor: {monitor['width']}x{monitor['height']})")
+            # Tenter d'initialiser mss
+            try:
+                sct = mss.mss()
+                monitor = sct.monitors[1]
+                logger.info(f"mss initialized (monitor: {monitor['width']}x{monitor['height']})")
+            except Exception as e:
+                logger.warning(f"mss initialization failed: {e}, will use PIL fallback")
+                use_mss = False
+                sct = None
             
             frame_count = 0
             last_log_time = time.time()
 
             while self.is_running and self.is_streaming:
                 try:
-                    # Capture screen frame avec mss (pas de subprocess, pas de flash)
-                    sct_img = sct.grab(monitor)
+                    # Capture d'écran avec fallback automatique
+                    frame = None
                     
-                    # mss retourne BGRA sur la plupart des systèmes
-                    # Convertir en numpy array
-                    frame = np.array(sct_img, dtype=np.uint8)
+                    if use_mss and sct:
+                        try:
+                            frame = self._capture_screen_mss(sct, monitor)
+                            mss_fail_count = 0  # Reset sur succès
+                        except Exception as e:
+                            mss_fail_count += 1
+                            logger.warning(f"mss capture failed ({mss_fail_count}/{MAX_MSS_FAILURES}): {e}")
+                            
+                            if mss_fail_count >= MAX_MSS_FAILURES:
+                                logger.error("mss failed too many times, switching to PIL fallback")
+                                use_mss = False
+                                if sct:
+                                    try:
+                                        sct.close()
+                                    except:
+                                        pass
+                                    sct = None
+                            continue
                     
-                    # Log pour debug
-                    if frame_count == 0:
-                        logger.info(f"First frame captured: shape={frame.shape}, dtype={frame.dtype}")
+                    # Fallback vers PIL si mss désactivé ou non disponible
+                    if frame is None and not use_mss:
+                        try:
+                            frame = self._capture_screen_pil()
+                            if frame_count == 0:
+                                logger.info("Using PIL/pyscreenshot fallback for screen capture")
+                        except Exception as e:
+                            logger.error(f"PIL capture failed: {e}")
+                            time.sleep(0.1)
+                            continue
                     
-                    # Vérifier que l'image n'est pas vide ou noire
-                    if frame.size == 0:
-                        logger.warning("Empty frame captured, skipping")
+                    if frame is None:
                         continue
                     
-                    # mss retourne BGRA (4 canaux), on garde BGR (3 canaux)
-                    if frame.ndim == 3 and frame.shape[2] == 4:
-                        frame = frame[:, :, :3]  # BGRA -> BGR (supprimer le canal alpha)
-                    elif frame.ndim == 3 and frame.shape[2] == 3:
-                        pass  # Déjà en BGR
-                    else:
-                        logger.warning(f"Unexpected frame format: {frame.shape}")
+                    # Log pour debug (première frame seulement)
+                    if frame_count == 0:
+                        logger.info(f"First frame captured: shape={frame.shape}, dtype={frame.dtype}, backend={'mss' if use_mss else 'PIL'}")
+                    
+                    # Vérifier que l'image n'est pas vide
+                    if frame.size == 0:
+                        logger.warning("Empty frame captured, skipping")
                         continue
                     
                     frame = imutils.resize(frame, width=DEFAULT_WIDTH)
@@ -479,11 +537,6 @@ class ScreenServer(QObject):
                         cv2.IMWRITE_JPEG_PROGRESSIVE,
                         1,
                     ]
-                    # Debug: log capture shape before encoding
-                    try:
-                        logger.debug(f"Captured frame shape: {getattr(frame, 'shape', 'unknown')}")
-                    except Exception:
-                        pass
 
                     # Initial encode
                     encoded, buffer = cv2.imencode('.jpg', frame, encode_params)
@@ -503,44 +556,35 @@ class ScreenServer(QObject):
                             orig_h = int(DEFAULT_WIDTH * 9 / 16)
 
                         cur_w = orig_w
-                        # Reduce by 90% steps until we fit or reach a minimum width
                         while len(jpeg_bytes) > MAX_UDP_PAYLOAD and cur_w > 200:
                             cur_w = max(200, int(cur_w * 0.9))
                             try:
                                 smaller = imutils.resize(frame, width=cur_w)
                                 encoded, buffer = cv2.imencode('.jpg', smaller, encode_params)
                                 if not encoded:
-                                    logger.debug("Downscale encode failed; breaking")
                                     break
                                 jpeg_bytes = buffer.tobytes()
-                                logger.debug(f"Downscaled to {cur_w}x{smaller.shape[0]} => {len(jpeg_bytes)} bytes")
                             except Exception as e:
-                                logger.exception(f"Error while downscaling/encoding: {e}")
+                                logger.exception(f"Error while downscaling: {e}")
                                 break
 
-                    logger.debug(f"Encoded JPEG size: {len(jpeg_bytes)} bytes")
-
-                    # Send to all connected clients (UDP) with defensive checks
+                    # Send to all connected clients (UDP)
                     for client_id, client_addr in list(self.connected_clients.items()):
                         if not self.is_streaming:
-                            logger.debug("is_streaming cleared; aborting sends")
                             break
                         if not self.video_socket:
-                            logger.debug("video_socket is None; aborting sends")
                             break
 
                         try:
-                            logger.debug(f"Sending frame to {client_id} -> {client_addr}")
                             self.video_socket.sendto(jpeg_bytes, client_addr)
                             frame_count += 1
                             if frame_count % 100 == 0:
-                                logger.info(f"Sent {frame_count} frames (latest to {client_addr})")
+                                logger.info(f"Sent {frame_count} frames (backend={'mss' if use_mss else 'PIL'})")
                         except OSError as e:
                             logger.exception(f"Error sending to {client_addr}: {e}")
                             win_err = getattr(e, 'winerror', None)
-                            # If socket invalid/closed concurrently, stop streaming to avoid tight loop
                             if win_err == 10038:
-                                logger.error("Socket invalid or closed (10038) — stopping video streamer")
+                                logger.error("Socket invalid or closed — stopping video streamer")
                                 try:
                                     if self.video_socket:
                                         self.video_socket.close()
@@ -552,23 +596,22 @@ class ScreenServer(QObject):
                         except Exception as e:
                             logger.exception(f"Unexpected error sending to {client_addr}: {e}")
 
-                    # Petit délai pour éviter surcharge (optionnel, ajustable)
+                    # Petit délai pour éviter surcharge
                     time.sleep(0.01)
 
                 except Exception as e:
                     logger.error(f"Erreur dans video_streamer loop: {e}", exc_info=True)
-                    time.sleep(0.01)
+                    time.sleep(0.05)
                     
                 # Log stats périodiques
                 if time.time() - last_log_time > 10:
-                    logger.info(f"Video streamer stats: frames_sent={frame_count}, clients={len(self.connected_clients)}")
+                    logger.info(f"Video streamer stats: frames_sent={frame_count}, clients={len(self.connected_clients)}, backend={'mss' if use_mss else 'PIL'}")
                     last_log_time = time.time()
                     
         except Exception as e:
             self.error_occurred.emit(f"Erreur vidéo: {e}")
             logger.exception(f"Video streamer fatal error: {e}")
         finally:
-            # Fermer l'instance mss proprement
             if sct:
                 try:
                     sct.close()
