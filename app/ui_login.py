@@ -21,7 +21,8 @@ class LoginWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Screen Sharing - Connexion")
-        self.setFixedSize(400, 500)
+        # Allow window to expand so wrapped text isn't clipped; keep a reasonable minimum
+        self.setMinimumSize(400, 480)
         self.setup_ui()
         self.apply_style()
         
@@ -53,20 +54,23 @@ class LoginWindow(QWidget):
         # Frame de connexion
         login_frame = QFrame()
         login_frame.setFrameShape(QFrame.StyledPanel)
+        # Remove padding from CSS (Qt doesn't handle it well for QFrame children)
         login_frame.setStyleSheet("""
-            QFrame {
+            QFrame#loginFrame {
                 background-color: #f5f5f5;
                 border-radius: 10px;
-                padding: 14px;
             }
         """)
+        login_frame.setObjectName("loginFrame")
         login_layout = QVBoxLayout(login_frame)
-        login_layout.setSpacing(10)
+        login_layout.setSpacing(12)
+        # Use layout margins instead of CSS padding
+        login_layout.setContentsMargins(20, 20, 20, 20)
         
         # Champ utilisateur
         user_label = QLabel("👤 Nom d'utilisateur")
         user_label.setFont(QFont("Segoe UI", 10))
-        user_label.setStyleSheet("color: #111;")
+        user_label.setStyleSheet("color: #111; background: transparent;")
         login_layout.addWidget(user_label)
         
         self.username_input = QLineEdit()
@@ -79,7 +83,7 @@ class LoginWindow(QWidget):
         # Champ mot de passe
         pass_label = QLabel("🔒 Mot de passe")
         pass_label.setFont(QFont("Segoe UI", 10))
-        pass_label.setStyleSheet("color: #111;")
+        pass_label.setStyleSheet("color: #111; background: transparent;")
         login_layout.addWidget(pass_label)
 
         
@@ -93,7 +97,7 @@ class LoginWindow(QWidget):
         # Erreur inline (évite les popups intrusives)
         self.error_label = QLabel("")
         self.error_label.setWordWrap(True)
-        self.error_label.setStyleSheet("color: #f44336; font-size: 11px;")
+        self.error_label.setStyleSheet("color: #f44336; font-size: 12px; background: transparent;")
         self.error_label.hide()
         login_layout.addWidget(self.error_label)
         
@@ -110,11 +114,7 @@ class LoginWindow(QWidget):
         # Espace extensible
         main_layout.addStretch()
         
-        # Info comptes de test
-        info_label = QLabel("Comptes de test:\nadmin / admin123\nuser1 / password1")
-        info_label.setAlignment(Qt.AlignCenter)
-        info_label.setStyleSheet("color: #999; font-size: 10px;")
-        main_layout.addWidget(info_label)
+        # Test accounts info removed per UX decision
 
         # Focus direct
         self.username_input.setFocus()
@@ -145,13 +145,23 @@ class LoginWindow(QWidget):
         username = self.username_input.text().strip()
         password = self.password_input.text()
 
+        # Reset error state and ensure inputs use a safe explicit style
         self.error_label.hide()
-        self.username_input.setStyleSheet("")
-        self.password_input.setStyleSheet("")
+        safe_input_style = (
+            "border: 2px solid #ddd; border-radius: 8px; padding: 8px 12px; "
+            "font-size: 14px; background-color: white; color: #333;"
+        )
+        self.username_input.setStyleSheet(safe_input_style)
+        self.password_input.setStyleSheet(safe_input_style)
         
         if not username or not password:
             self.error_label.setText("Veuillez remplir tous les champs.")
             self.error_label.show()
+            # Highlight missing fields
+            if not username:
+                self.username_input.setStyleSheet(safe_input_style + " border-color: #f44336;")
+            if not password:
+                self.password_input.setStyleSheet(safe_input_style + " border-color: #f44336;")
             return
             
         # Vérification des identifiants
@@ -163,7 +173,9 @@ class LoginWindow(QWidget):
             self.error_label.show()
             self.password_input.clear()
             self.password_input.setFocus()
-            
+            # mark inputs as error visually
+            self.username_input.setStyleSheet(safe_input_style + " border-color: #f44336;")
+            self.password_input.setStyleSheet(safe_input_style + " border-color: #f44336;")
     def clear_fields(self):
         """Efface les champs de saisie"""
         self.username_input.clear()
