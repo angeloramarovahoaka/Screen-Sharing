@@ -747,7 +747,7 @@ class MainWindow(QMainWindow):
             
             # Afficher l'IP locale pour que les autres puissent se connecter
             local_ip = self._get_local_ip()
-            self.toast.show_toast(f"Partage démarré • IP: {local_ip}", kind="success", duration=5000)
+            self.toast.show_toast(f"Partage démarré • IP: {local_ip}", kind="success", duration_ms=5000)
             self._refresh_app_status()
     
     def _get_local_ip(self):

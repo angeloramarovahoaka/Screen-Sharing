@@ -446,9 +446,27 @@ class ScreenServer(QObject):
                     # Capture screen frame avec mss (pas de subprocess, pas de flash)
                     sct_img = sct.grab(monitor)
                     
-                    # mss retourne BGRA, convertir en numpy array et garder BGR (drop alpha)
+                    # mss retourne BGRA sur la plupart des systèmes
+                    # Convertir en numpy array
                     frame = np.array(sct_img, dtype=np.uint8)
-                    frame = frame[:, :, :3]  # BGRA -> BGR (supprimer le canal alpha)
+                    
+                    # Log pour debug
+                    if frame_count == 0:
+                        logger.info(f"First frame captured: shape={frame.shape}, dtype={frame.dtype}")
+                    
+                    # Vérifier que l'image n'est pas vide ou noire
+                    if frame.size == 0:
+                        logger.warning("Empty frame captured, skipping")
+                        continue
+                    
+                    # mss retourne BGRA (4 canaux), on garde BGR (3 canaux)
+                    if frame.ndim == 3 and frame.shape[2] == 4:
+                        frame = frame[:, :, :3]  # BGRA -> BGR (supprimer le canal alpha)
+                    elif frame.ndim == 3 and frame.shape[2] == 3:
+                        pass  # Déjà en BGR
+                    else:
+                        logger.warning(f"Unexpected frame format: {frame.shape}")
+                        continue
                     
                     frame = imutils.resize(frame, width=DEFAULT_WIDTH)
 
@@ -538,7 +556,7 @@ class ScreenServer(QObject):
                     time.sleep(0.01)
 
                 except Exception as e:
-                    logger.debug(f"Erreur dans video_streamer loop: {e}")
+                    logger.error(f"Erreur dans video_streamer loop: {e}", exc_info=True)
                     time.sleep(0.01)
                     
                 # Log stats périodiques
