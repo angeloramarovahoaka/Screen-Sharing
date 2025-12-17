@@ -92,7 +92,42 @@ class LoginWindow(QWidget):
         self.password_input.setEchoMode(QLineEdit.Password)
         self.password_input.setMinimumHeight(40)
         self.password_input.returnPressed.connect(self.handle_login)
-        login_layout.addWidget(self.password_input)
+        # Add a small row with the password input and a show/hide toggle button
+        pw_row = QHBoxLayout()
+        pw_row.setContentsMargins(0, 0, 0, 0)
+        pw_row.setSpacing(8)
+        pw_row.addWidget(self.password_input)
+
+        self.pw_toggle = QPushButton("👁")
+        self.pw_toggle.setCheckable(True)
+        self.pw_toggle.setFixedSize(42, 42)
+        # Use a visible styled button (not fully flat) so it contrasts on white
+        self.pw_toggle.setFlat(False)
+        self.pw_toggle.setCursor(Qt.PointingHandCursor)
+        self.pw_toggle.setToolTip("Afficher / masquer le mot de passe")
+        # Style: colored icon when unchecked, accent background when checked
+        self.pw_toggle.setStyleSheet(
+            f"""
+            QPushButton {{
+                background: transparent;
+                border: 1px solid #e0e0e0;
+                border-radius: 6px;
+                color: {THEME.primary};
+                font-size: 14px;
+            }}
+            QPushButton:hover {{
+                background: #f6f9ff;
+            }}
+            QPushButton:checked {{
+                background: {THEME.primary};
+                color: white;
+            }}
+            """
+        )
+        self.pw_toggle.clicked.connect(self._toggle_password_visibility)
+        pw_row.addWidget(self.pw_toggle)
+
+        login_layout.addLayout(pw_row)
 
         # Erreur inline (évite les popups intrusives)
         self.error_label = QLabel("")
@@ -139,6 +174,21 @@ class LoginWindow(QWidget):
             }
             /* Le style du bouton principal est appliqué sur login_button */
         """)
+
+    def _toggle_password_visibility(self):
+        """Toggle the password field echo between hidden and visible."""
+        try:
+            if self.pw_toggle.isChecked():
+                self.password_input.setEchoMode(QLineEdit.Normal)
+                self.pw_toggle.setText("🙈")
+            else:
+                self.password_input.setEchoMode(QLineEdit.Password)
+                self.pw_toggle.setText("👁")
+        except Exception:
+            # Safe guard: if anything goes wrong, ensure password remains hidden
+            self.password_input.setEchoMode(QLineEdit.Password)
+            self.pw_toggle.setChecked(False)
+            self.pw_toggle.setText("👁")
         
     def handle_login(self):
         """Gère la tentative de connexion"""
