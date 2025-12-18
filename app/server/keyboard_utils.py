@@ -12,11 +12,14 @@ if platform.system() == 'Windows':
 # Mapping des touches spéciales vers pynput
 KEY_MAPPING = {
     'enter': Key.enter,
+    'return': Key.enter, # Alias souvent utilisé
     'backspace': Key.backspace,
     'tab': Key.tab,
     'esc': Key.esc,
+    'escape': Key.esc,
     'space': Key.space,
     'delete': Key.delete,
+    'del': Key.delete,
     'home': Key.home,
     'end': Key.end,
     'left': Key.left,
@@ -38,10 +41,20 @@ KEY_MAPPING = {
     'alt': Key.alt_l,
     'alt_l': Key.alt_l,
     'alt_r': Key.alt_r,
+    'alt_gr': Key.alt_gr,
+    
+    # --- CORRECTION ICI : Alias complets pour la touche Windows ---
     'cmd': Key.cmd,
     'cmd_l': Key.cmd,
     'cmd_r': Key.cmd_r,
+    'win': Key.cmd,       # Indispensable
+    'windows': Key.cmd,   # Indispensable
+    'super': Key.cmd,     # Linux
+    'meta': Key.cmd,
+    'menu': Key.menu,
+    
     'caps_lock': Key.caps_lock,
+    'num_lock': Key.num_lock,
     'insert': Key.insert,
     'pause': Key.pause,
     'print_screen': Key.print_screen,
@@ -60,15 +73,17 @@ KEY_MAPPING = {
 }
 
 # Liste des modificateurs
+# --- CORRECTION ICI : Ajout de win/windows/super ---
 MODIFIER_KEYS = (
     'ctrl', 'ctrl_l', 'ctrl_r',
-    'alt', 'alt_l', 'alt_r',
+    'alt', 'alt_l', 'alt_r', 'alt_gr',
     'shift', 'shift_l', 'shift_r',
-    'cmd', 'cmd_l', 'cmd_r'
+    'cmd', 'cmd_l', 'cmd_r', 
+    'win', 'windows', 'super', 'meta'
 )
 
 # Touches directionnelles
-ARROW_KEYS = ('arrow_left', 'arrow_up', 'arrow_right', 'arrow_down')
+ARROW_KEYS = ('arrow_left', 'arrow_up', 'arrow_right', 'arrow_down', 'left', 'right', 'up', 'down')
 
 # Codes virtuels Windows pour les touches directionnelles
 VK_LEFT = 0x25
@@ -81,37 +96,30 @@ VK_ARROW_CODES = {
     'arrow_left': VK_LEFT,
     'arrow_up': VK_UP,
     'arrow_right': VK_RIGHT,
-    'arrow_down': VK_DOWN
+    'arrow_down': VK_DOWN,
+    'left': VK_LEFT,
+    'up': VK_UP,
+    'right': VK_RIGHT,
+    'down': VK_DOWN
 }
 
 
 def get_pynput_key(key_name: str):
-    """Convertit une chaîne en objet pynput Key ou caractère.
+    """Convertit une chaîne en objet pynput Key ou caractère."""
+    if not key_name:
+        return None
+    # Normaliser en minuscules pour éviter les erreurs "Win" vs "win"
+    key_name = str(key_name).lower()
     
-    Args:
-        key_name: Nom de la touche (ex: 'enter', 'a', 'ctrl')
-        
-    Returns:
-        Key object ou caractère
-    """
     if key_name in KEY_MAPPING:
         return KEY_MAPPING[key_name]
-    # Retourner le caractère tel quel (pour les lettres, chiffres, etc.)
     return key_name
 
 
 def press_arrow_key_windows(direction: str) -> bool:
-    """Appuie sur une touche directionnelle en utilisant l'API Windows native.
-    
-    Args:
-        direction: 'arrow_left', 'arrow_up', 'arrow_right', ou 'arrow_down'
-        
-    Returns:
-        True si réussi, False sinon
-    """
     if platform.system() != 'Windows':
         return False
-        
+    direction = str(direction).lower()
     if direction in VK_ARROW_CODES:
         ctypes.windll.user32.keybd_event(VK_ARROW_CODES[direction], 0, 0, 0)
         return True
@@ -119,17 +127,9 @@ def press_arrow_key_windows(direction: str) -> bool:
 
 
 def release_arrow_key_windows(direction: str) -> bool:
-    """Relâche une touche directionnelle en utilisant l'API Windows native.
-    
-    Args:
-        direction: 'arrow_left', 'arrow_up', 'arrow_right', ou 'arrow_down'
-        
-    Returns:
-        True si réussi, False sinon
-    """
     if platform.system() != 'Windows':
         return False
-        
+    direction = str(direction).lower()
     if direction in VK_ARROW_CODES:
         ctypes.windll.user32.keybd_event(VK_ARROW_CODES[direction], 0, KEYEVENTF_KEYUP, 0)
         return True
@@ -137,24 +137,10 @@ def release_arrow_key_windows(direction: str) -> bool:
 
 
 def is_modifier_key(key_name: str) -> bool:
-    """Vérifie si une touche est un modificateur.
-    
-    Args:
-        key_name: Nom de la touche
-        
-    Returns:
-        True si c'est un modificateur
-    """
-    return key_name in MODIFIER_KEYS
+    if not key_name: return False
+    return str(key_name).lower() in MODIFIER_KEYS
 
 
 def is_arrow_key(key_name: str) -> bool:
-    """Vérifie si une touche est une touche directionnelle.
-    
-    Args:
-        key_name: Nom de la touche
-        
-    Returns:
-        True si c'est une touche directionnelle
-    """
-    return key_name in ARROW_KEYS
+    if not key_name: return False
+    return str(key_name).lower() in ARROW_KEYS
