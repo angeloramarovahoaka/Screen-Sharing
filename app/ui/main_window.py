@@ -14,7 +14,7 @@ from app.client.screen_client import ScreenClient
 from app.client.multi_screen_client import MultiScreenClient
 from ..server import ScreenServer
 from .ui_login import UserInfoWidget
-from .ui_screens import ScreenListWidget, ScreenViewer
+from .screens import ScreenListWidget, ScreenViewer
 from .ui_style import THEME, ToastOverlay, button_solid, button_outline, status_badge
 from .dialogs import AddScreenDialog, LogoutConfirmDialog, MonitorSelectDialog
 
