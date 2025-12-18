@@ -328,6 +328,49 @@ class ScreenServer(QObject):
             self._discovery_socket = None
         logger.info("Discovery broadcast stopped")
     
+    # def _discovery_broadcaster(self):
+    #     """Thread qui envoie périodiquement un message d'annonce sur le réseau"""
+    #     try:
+    #         self._discovery_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    #         self._discovery_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    #         self._discovery_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            
+    #         local_ip = self._get_local_ip()
+            
+    #         while self.is_streaming and self.is_running:
+    #             try:
+    #                 # Message d'annonce JSON
+    #                 announcement = json.dumps({
+    #                     "type": "screen_share_announcement",
+    #                     "name": self._sharer_name,
+    #                     "ip": local_ip,
+    #                     "port": COMMAND_PORT,
+    #                     "video_port": VIDEO_PORT
+    #                 })
+                    
+    #                 # Envoyer en broadcast
+    #                 self._discovery_socket.sendto(
+    #                     announcement.encode('utf-8'),
+    #                     ('<broadcast>', DISCOVERY_PORT)
+    #                 )
+    #                 logger.debug(f"Sent discovery broadcast: {announcement}")
+                    
+    #             except Exception as e:
+    #                 logger.debug(f"Discovery broadcast error: {e}")
+                
+    #             # Attendre 2 secondes avant le prochain broadcast
+    #             time.sleep(2)
+                
+    #     except Exception as e:
+    #         logger.exception(f"Discovery broadcaster error: {e}")
+    #     finally:
+    #         if self._discovery_socket:
+    #             try:
+    #                 self._discovery_socket.close()
+    #             except Exception:
+    #                 pass
+    #             self._discovery_socket = None
+
     def _discovery_broadcaster(self):
         """Thread qui envoie périodiquement un message d'annonce sur le réseau"""
         try:
@@ -336,6 +379,18 @@ class ScreenServer(QObject):
             self._discovery_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             
             local_ip = self._get_local_ip()
+            
+            # --- FIX SPECIAL WINDOWS ---
+            # Sur Windows, si on ne lie (bind) pas le socket à l'IP locale précise,
+            # Windows peut envoyer le broadcast sur une mauvaise interface (ex: VirtualBox)
+            # ou le bloquer.
+            try:
+                # On lie le socket à l'IP de la machine A (192.168.11.183)
+                self._discovery_socket.bind((local_ip, 0))
+                logger.info(f"Discovery socket bound to interface: {local_ip}")
+            except Exception as e:
+                logger.warning(f"Could not bind discovery socket to {local_ip}: {e}")
+            # ---------------------------
             
             while self.is_streaming and self.is_running:
                 try:
@@ -348,11 +403,16 @@ class ScreenServer(QObject):
                         "video_port": VIDEO_PORT
                     })
                     
-                    # Envoyer en broadcast
-                    self._discovery_socket.sendto(
-                        announcement.encode('utf-8'),
-                        ('<broadcast>', DISCOVERY_PORT)
-                    )
+                    data = announcement.encode('utf-8')
+                    
+                    # Sur Windows, utiliser l'adresse de broadcast universelle '255.255.255.255'
+                    # fonctionne souvent mieux que '<broadcast>' quand le socket est bindé.
+                    try:
+                        self._discovery_socket.sendto(data, ('255.255.255.255', DISCOVERY_PORT))
+                    except Exception:
+                        # Fallback standard si le 255... est refusé
+                        self._discovery_socket.sendto(data, ('<broadcast>', DISCOVERY_PORT))
+                        
                     logger.debug(f"Sent discovery broadcast: {announcement}")
                     
                 except Exception as e:
@@ -370,7 +430,7 @@ class ScreenServer(QObject):
                 except Exception:
                     pass
                 self._discovery_socket = None
-
+                
     def _broadcast_control(self, message: dict):
         """Envoie un message JSON (ligne) à tous les clients connectés (best-effort)."""
         try:
