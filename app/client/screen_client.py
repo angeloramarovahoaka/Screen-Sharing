@@ -49,6 +49,7 @@ class KeyboardGrabber(QObject):
         self.capture_ended.emit()
 
     def _on_press(self, key):
+        print(f"TOUCHE APPUYÉE: {key}")
         try:
             if key == self.escape_key:
                 self.stop()
@@ -63,9 +64,12 @@ class KeyboardGrabber(QObject):
         except: pass
 
     def _get_key_name(self, key):
-        if hasattr(key, 'char') and key.char: return key.char
-        if hasattr(key, 'name'):
-            if key.name == 'cmd': return 'win' # Renommer cmd en win
+        if hasattr(key, 'char') and key.char:
+            return key.char
+        elif hasattr(key, 'name'):
+            # Sur Linux, la touche Windows est souvent 'cmd' ou 'super'
+            if key.name in ['cmd', 'cmd_l', 'cmd_r', 'super', 'super_l', 'super_r']: 
+                return 'win' 
             return key.name
         return str(key).replace("Key.", "")
 
