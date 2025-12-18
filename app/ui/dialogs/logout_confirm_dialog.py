@@ -39,8 +39,7 @@ class LogoutConfirmDialog(QDialog):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setContentsMargins(30, 30, 30, 30)
 
         # Titre
         header_layout = QHBoxLayout()
@@ -52,22 +51,17 @@ class LogoutConfirmDialog(QDialog):
 
         message_label = QLabel("Voulez-vous vraiment vous déconnecter ?")
         message_label.setObjectName("messageLabel")
-        message_label.setWordWrap(True)
         title_layout.addWidget(message_label)
 
         header_layout.addLayout(title_layout)
-        header_layout.addStretch()
         layout.addLayout(header_layout)
-
-        layout.addStretch()
 
         # Boutons
         btn_layout = QHBoxLayout()
-        btn_layout.setSpacing(12)
 
         cancel_btn = QPushButton("Annuler")
         cancel_btn.setCursor(Qt.PointingHandCursor)
-        cancel_btn.setMinimumHeight(40)
+        cancel_btn.setMinimumHeight(30)
         cancel_btn.setStyleSheet("""
             QPushButton {
                 background-color: #f0f0f0;
@@ -88,8 +82,6 @@ class LogoutConfirmDialog(QDialog):
         """)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
-
-        btn_layout.addStretch()
 
         logout_btn = QPushButton("Se déconnecter")
         logout_btn.setCursor(Qt.PointingHandCursor)
