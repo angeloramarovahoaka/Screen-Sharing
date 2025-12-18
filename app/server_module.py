@@ -329,7 +329,7 @@ class ScreenServer(QObject):
         logger.info("Discovery broadcast stopped")
     
     def _discovery_broadcaster(self):
-        """Thread qui envoie périodiquement un message d'annonce sur le réseau"""
+        """Thread qui envoie périodiquement un message d'annonce sur le réseau ici"""
         try:
             self._discovery_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self._discovery_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
