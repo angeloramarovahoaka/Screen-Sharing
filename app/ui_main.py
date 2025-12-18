@@ -103,13 +103,13 @@ class AddScreenDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         
         # Titre
-        title = QLabel("🖥️ Écrans partagés disponibles")
+        title = QLabel(" Écrans partagés disponibles")
         title.setFont(QFont("Segoe UI", 14, QFont.Bold))
         title.setStyleSheet("color: #1976D2; background: transparent;")
         layout.addWidget(title)
         
         # Indication
-        self.status_label = QLabel("🔍 Recherche en cours...")
+        self.status_label = QLabel(" Recherche en cours...")
         self.status_label.setStyleSheet("color: #666666; font-style: italic; background: transparent;")
         layout.addWidget(self.status_label)
         
@@ -127,7 +127,7 @@ class AddScreenDialog(QDialog):
         manual_layout.setSpacing(10)
         manual_layout.setContentsMargins(12, 12, 12, 12)
         
-        manual_title = QLabel("📝 Ou entrer l'IP manuellement:")
+        manual_title = QLabel("Ou entrer l'IP manuellement:")
         manual_title.setFont(QFont("Segoe UI", 10))
         manual_title.setStyleSheet("color: #555555; background: transparent;")
         manual_layout.addWidget(manual_title)
@@ -168,7 +168,7 @@ class AddScreenDialog(QDialog):
         # Boutons du bas
         btn_layout = QHBoxLayout()
         
-        self.refresh_btn = QPushButton("🔄 Actualiser")
+        self.refresh_btn = QPushButton(" Actualiser")
         self.refresh_btn.setCursor(Qt.PointingHandCursor)
         self.refresh_btn.clicked.connect(self._start_scan)
         self.refresh_btn.setStyleSheet("""
@@ -248,7 +248,7 @@ class AddScreenDialog(QDialog):
         self.server_list.clear()
         self.selected_server = None
         self.connect_btn.setEnabled(False)
-        self.status_label.setText("🔍 Recherche en cours...")
+        self.status_label.setText("Recherche en cours...")
         self.status_label.setStyleSheet("color: #666666; font-style: italic; background: transparent;")
         self.refresh_btn.setEnabled(False)
         self.scanner.start_scan(duration=3.0)
@@ -256,20 +256,20 @@ class AddScreenDialog(QDialog):
     def _on_server_found(self, server_info):
         """Appelé quand un serveur est trouvé"""
         item = QListWidgetItem()
-        item.setText(f"🖥️ {server_info['name']}\n     📍 {server_info['ip']}")
+        item.setText(f"🖥️ {server_info['name']}\n      {server_info['ip']}")
         item.setData(Qt.UserRole, server_info)
         self.server_list.addItem(item)
         
         # Mettre à jour le statut
         count = self.server_list.count()
-        self.status_label.setText(f"✅ {count} écran(s) trouvé(s)")
+        self.status_label.setText(f" {count} écran(s) trouvé(s)")
         self.status_label.setStyleSheet("color: #4CAF50; font-weight: bold; background: transparent;")
         
     def _on_scan_finished(self):
         """Appelé quand le scan est terminé"""
         self.refresh_btn.setEnabled(True)
         if self.server_list.count() == 0:
-            self.status_label.setText("❌ Aucun écran partagé trouvé sur le réseau")
+            self.status_label.setText(" Aucun écran partagé trouvé sur le réseau")
             self.status_label.setStyleSheet("color: #f44336; background: transparent;")
         
     def _on_server_selected(self, item):
@@ -309,6 +309,121 @@ class AddScreenDialog(QDialog):
         """Arrête le scanner à la fermeture"""
         self.scanner.stop_scan()
         super().closeEvent(event)
+
+
+class LogoutConfirmDialog(QDialog):
+    """Dialog de confirmation de déconnexion avec style personnalisé"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Déconnexion")
+        self.setFixedSize(380, 200)
+        self.setModal(True)
+        self._apply_style()
+        self.setup_ui()
+        
+    def _apply_style(self):
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #ffffff;
+                border-radius: 12px;
+            }
+            QLabel {
+                color: #333333;
+                background: transparent;
+            }
+            QLabel#titleLabel {
+                color: #1976D2;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QLabel#messageLabel {
+                color: #555555;
+                font-size: 13px;
+            }
+            QLabel#iconLabel {
+                font-size: 48px;
+            }
+        """)
+        
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(15)
+        layout.setContentsMargins(25, 25, 25, 25)
+        
+        # Titre
+        header_layout = QHBoxLayout()
+        
+        title_layout = QVBoxLayout()
+        title_label = QLabel("Déconnexion")
+        title_label.setObjectName("titleLabel")
+        title_layout.addWidget(title_label)
+        
+        message_label = QLabel("Voulez-vous vraiment vous déconnecter ?")
+        message_label.setObjectName("messageLabel")
+        message_label.setWordWrap(True)
+        title_layout.addWidget(message_label)
+        
+        header_layout.addLayout(title_layout)
+        header_layout.addStretch()
+        layout.addLayout(header_layout)
+        
+        layout.addStretch()
+        
+        # Boutons
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(12)
+        
+        cancel_btn = QPushButton("Annuler")
+        cancel_btn.setCursor(Qt.PointingHandCursor)
+        cancel_btn.setMinimumHeight(40)
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f0f0f0;
+                color: #333333;
+                border: 1px solid #cccccc;
+                border-radius: 8px;
+                padding: 10px 24px;
+                font-size: 13px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+                border-color: #bbbbbb;
+            }
+            QPushButton:pressed {
+                background-color: #d0d0d0;
+            }
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        
+        btn_layout.addStretch()
+        
+        logout_btn = QPushButton("Se déconnecter")
+        logout_btn.setCursor(Qt.PointingHandCursor)
+        logout_btn.setMinimumHeight(40)
+        logout_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: #ffffff;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 24px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #d32f2f;
+            }
+            QPushButton:pressed {
+                background-color: #c62828;
+            }
+        """)
+        logout_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(logout_btn)
+        
+        layout.addLayout(btn_layout)
 
 
 class MainWindow(QMainWindow):
@@ -375,13 +490,13 @@ class MainWindow(QMainWindow):
         toolbar_layout.setContentsMargins(15, 5, 15, 5)
         
         # Boutons de la barre d'outils
-        self.add_screen_btn = QPushButton("➕ Ajouter écran")
+        self.add_screen_btn = QPushButton(" Ajouter écran")
         self.add_screen_btn.setCursor(Qt.PointingHandCursor)
         self.add_screen_btn.setStyleSheet(button_outline(THEME.success, hover_bg="rgba(76,175,80,0.10)", padding="9px 14px"))
         self.add_screen_btn.setMinimumHeight(38)
         toolbar_layout.addWidget(self.add_screen_btn)
         
-        self.share_screen_btn = QPushButton("📤 Partager mon écran")
+        self.share_screen_btn = QPushButton(" Partager mon écran")
         self.share_screen_btn.setCursor(Qt.PointingHandCursor)
         self.share_screen_btn.setStyleSheet(button_solid(THEME.primary, THEME.primary_hover, padding="11px 18px"))
         self.share_screen_btn.setMinimumHeight(40)
@@ -478,14 +593,9 @@ class MainWindow(QMainWindow):
         
     def handle_logout(self):
         """Gère la déconnexion"""
-        reply = QMessageBox.question(
-            self,
-            "Déconnexion",
-            "Voulez-vous vraiment vous déconnecter ?",
-            QMessageBox.Yes | QMessageBox.No
-        )
+        dialog = LogoutConfirmDialog(self)
         
-        if reply == QMessageBox.Yes:
+        if dialog.exec() == QDialog.Accepted:
             # Fermer toutes les connexions
             self.multi_client.disconnect_all()
             self.server.stop()
@@ -728,7 +838,7 @@ class MainWindow(QMainWindow):
         if self.server.is_streaming:
             # Arrêter le streaming
             self.server.stop_streaming()
-            self.share_screen_btn.setText("📤 Partager mon écran")
+            self.share_screen_btn.setText(" Partager mon écran")
             self.share_screen_btn.setStyleSheet(button_solid(THEME.primary, THEME.primary_hover, padding="11px 18px"))
             self.toast.show_toast("Partage arrêté", kind="info")
             self._refresh_app_status()
@@ -742,7 +852,7 @@ class MainWindow(QMainWindow):
             
             # Démarrer le streaming vidéo
             self.server.start_streaming()
-            self.share_screen_btn.setText("🛑 Arrêter le partage")
+            self.share_screen_btn.setText(" Arrêter le partage")
             self.share_screen_btn.setStyleSheet(button_solid(THEME.danger, THEME.danger_hover, padding="11px 18px"))
             
             # Afficher l'IP locale pour que les autres puissent se connecter
@@ -781,5 +891,4 @@ class MainWindow(QMainWindow):
         # Nettoyer les ressources
         self.multi_client.disconnect_all()
         self.server.stop()
-        # Call subsystem removed; nothing to cleanup here
         event.accept()
