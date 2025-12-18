@@ -28,6 +28,11 @@ class ScreenViewer(QWidget):
         
         # Tracker l'état des touches modificatrices
         self.pressed_modifiers = set()
+        # Anti-oscillation / rate-limit pour les mouvements souris
+        self._last_send_time = 0.0
+        self._last_send_pos = (None, None)
+        self._send_min_interval = 1.0 / 30.0  # 30 Hz max
+        self._min_move_threshold = 0.005      # normalized units (0..1)
         
         self.setFocusPolicy(Qt.StrongFocus)
         self.setMouseTracking(True)
@@ -283,9 +288,25 @@ class ScreenViewer(QWidget):
         if self.is_controlling and self.client:
             norm_x, norm_y = self._get_normalized_position(event.pos())
             if norm_x is not None:
-                self.client.send_command({
-                    'type': 'mouse', 'action': 'move', 'x': norm_x, 'y': norm_y
-                })
+                import time
+                now = time.time()
+                last_x, last_y = self._last_send_pos
+
+                send = False
+                if last_x is None or last_y is None:
+                    send = True
+                else:
+                    dx = abs(norm_x - last_x)
+                    dy = abs(norm_y - last_y)
+                    if dx > self._min_move_threshold or dy > self._min_move_threshold:
+                        send = True
+
+                if send and (now - self._last_send_time) >= self._send_min_interval:
+                    self._last_send_time = now
+                    self._last_send_pos = (norm_x, norm_y)
+                    self.client.send_command({
+                        'type': 'mouse', 'action': 'move', 'x': norm_x, 'y': norm_y
+                    })
         super().mouseMoveEvent(event)
         
     def mousePressEvent(self, event: QMouseEvent):
@@ -373,7 +394,7 @@ class ScreenViewer(QWidget):
                 if (modifiers & Qt.ControlModifier): active_mods.append('ctrl')
                 if (modifiers & Qt.ShiftModifier): active_mods.append('shift')
                 if (modifiers & Qt.AltModifier): active_mods.append('alt')
-                if (modifiers & Qt.MetaModifier): active_mods.append('cmd')
+                if (modifiers & Qt.MetaModifier): active_mods.append('win')
 
                 key_name = self._get_key_name(event)
                 if key_name:
@@ -405,9 +426,9 @@ class ScreenViewer(QWidget):
             elif key == Qt.Key_Alt and 'alt' in self.pressed_modifiers:
                 self.client.send_command({'type': 'key', 'action': 'release', 'key': 'alt'})
                 self.pressed_modifiers.discard('alt')
-            elif key in [Qt.Key_Meta, Qt.Key_Super_L, Qt.Key_Super_R] and 'cmd' in self.pressed_modifiers:
-                self.client.send_command({'type': 'key', 'action': 'release', 'key': 'cmd'})
-                self.pressed_modifiers.discard('cmd')
+            elif key in [Qt.Key_Meta, Qt.Key_Super_L, Qt.Key_Super_R] and 'win' in self.pressed_modifiers:
+                self.client.send_command({'type': 'key', 'action': 'release', 'key': 'win'})
+                self.pressed_modifiers.discard('win')
             event.accept()
             return
         super().keyReleaseEvent(event)
@@ -432,7 +453,7 @@ class ScreenViewer(QWidget):
             Qt.Key_Left: 'arrow_left', Qt.Key_Right: 'arrow_right', Qt.Key_Up: 'arrow_up', Qt.Key_Down: 'arrow_down',
             Qt.Key_PageUp: 'page_up', Qt.Key_PageDown: 'page_down',
             Qt.Key_Shift: 'shift', Qt.Key_Control: 'ctrl', Qt.Key_Alt: 'alt',
-            Qt.Key_Meta: 'cmd', Qt.Key_Super_L: 'cmd', Qt.Key_Super_R: 'cmd_r',
+            Qt.Key_Meta: 'win', Qt.Key_Super_L: 'win', Qt.Key_Super_R: 'win',
             Qt.Key_CapsLock: 'caps_lock', Qt.Key_Insert: 'insert', Qt.Key_Pause: 'pause', Qt.Key_Print: 'print_screen',
             Qt.Key_F1: 'f1', Qt.Key_F2: 'f2', Qt.Key_F3: 'f3', Qt.Key_F4: 'f4', Qt.Key_F5: 'f5', Qt.Key_F6: 'f6',
             Qt.Key_F7: 'f7', Qt.Key_F8: 'f8', Qt.Key_F9: 'f9', Qt.Key_F10: 'f10', Qt.Key_F11: 'f11', Qt.Key_F12: 'f12',

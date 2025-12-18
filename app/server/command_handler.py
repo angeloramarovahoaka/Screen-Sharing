@@ -12,6 +12,8 @@ from .keyboard_utils import (
     get_pynput_key,
     press_arrow_key_windows,
     release_arrow_key_windows,
+    press_win_windows,
+    release_win_windows,
     is_modifier_key,
     is_arrow_key,
     MODIFIER_KEYS
@@ -181,6 +183,7 @@ class CommandHandler:
         Args:
             key_name: Nom de la touche
         """
+        # Special-case: use native Windows API for arrow keys and Win key
         if is_arrow_key(key_name):
             if platform.system() == 'Windows':
                 pressed = press_arrow_key_windows(key_name)
@@ -188,6 +191,18 @@ class CommandHandler:
                     time.sleep(0.005)
                     release_arrow_key_windows(key_name)
                     _ui_input_debug(f"Arrow {key_name} sent via ctypes")
+                else:
+                    self._pynput_press_release(key_name)
+            else:
+                self._pynput_press_release(key_name)
+        elif key_name in ('win', 'win_l', 'win_r'):
+            # Try native Windows Win key synth if available
+            if platform.system() == 'Windows':
+                pressed = press_win_windows(key_name)
+                if pressed:
+                    time.sleep(0.005)
+                    release_win_windows(key_name)
+                    _ui_input_debug(f"Win {key_name} sent via ctypes")
                 else:
                     self._pynput_press_release(key_name)
             else:
@@ -263,6 +278,19 @@ class CommandHandler:
         pynput_key = get_pynput_key(key_name)
         _ui_input_debug(f"pynput_key for '{key_name}': {pynput_key}")
         
+        # Special-case Win key on Windows: prefer native API
+        if key_name in ('win', 'win_l', 'win_r') and platform.system() == 'Windows':
+            try:
+                if action == 'press':
+                    press_win_windows(key_name)
+                    _ui_input_debug(f"Pressed native Win {key_name}")
+                elif action == 'release':
+                    release_win_windows(key_name)
+                    _ui_input_debug(f"Released native Win {key_name}")
+                return
+            except Exception as e:
+                logger.exception(f"Native Win key action failed: {e}")
+
         if pynput_key:
             try:
                 if action == 'press':

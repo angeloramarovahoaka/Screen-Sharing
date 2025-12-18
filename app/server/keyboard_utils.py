@@ -41,6 +41,9 @@ KEY_MAPPING = {
     'cmd': Key.cmd,
     'cmd_l': Key.cmd,
     'cmd_r': Key.cmd_r,
+    'win': Key.cmd,
+    'win_l': Key.cmd,
+    'win_r': Key.cmd_r,
     'caps_lock': Key.caps_lock,
     'insert': Key.insert,
     'pause': Key.pause,
@@ -64,7 +67,8 @@ MODIFIER_KEYS = (
     'ctrl', 'ctrl_l', 'ctrl_r',
     'alt', 'alt_l', 'alt_r',
     'shift', 'shift_l', 'shift_r',
-    'cmd', 'cmd_l', 'cmd_r'
+    'cmd', 'cmd_l', 'cmd_r',
+    'win', 'win_l', 'win_r'
 )
 
 # Touches directionnelles
@@ -83,6 +87,56 @@ VK_ARROW_CODES = {
     'arrow_right': VK_RIGHT,
     'arrow_down': VK_DOWN
 }
+
+# Codes virtuels Windows pour les touches Win
+VK_LWIN = 0x5B
+VK_RWIN = 0x5C
+
+
+def press_win_windows(which: str = 'win') -> bool:
+    """Appuie sur la touche Win via l'API Windows native.
+
+    Args:
+        which: 'win', 'win_l' ou 'win_r'
+
+    Returns:
+        True si réussi, False sinon
+    """
+    if platform.system() != 'Windows':
+        return False
+
+    code = VK_LWIN
+    if which == 'win_r':
+        code = VK_RWIN
+
+    try:
+        ctypes.windll.user32.keybd_event(code, 0, 0, 0)
+        return True
+    except Exception:
+        return False
+
+
+def release_win_windows(which: str = 'win') -> bool:
+    """Relâche la touche Win via l'API Windows native.
+
+    Args:
+        which: 'win', 'win_l' ou 'win_r'
+
+    Returns:
+        True si réussi, False sinon
+    """
+    if platform.system() != 'Windows':
+        return False
+
+    code = VK_LWIN
+    if which == 'win_r':
+        code = VK_RWIN
+
+    try:
+        ctypes.windll.user32.keybd_event(code, 0, KEYEVENTF_KEYUP, 0)
+        return True
+    except Exception:
+        return False
 
 
 def get_pynput_key(key_name: str):
