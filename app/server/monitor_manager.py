@@ -67,12 +67,14 @@ class MonitorManager:
                                 'height': mon['height'],
                                 'is_primary': (i == 1)
                             })
-                    return monitors
+                        logger.info(f"Detected {len(monitors)} monitors via mss")
+                        return monitors
             except Exception as e:
                 logger.warning(f"Error getting monitors with mss: {e}")
         
         # Fallback: un seul écran par défaut
-        return [{
+            logger.info("No multi-monitor detection available, using default 1 monitor fallback")
+            return [{
             'id': 1,
             'name': 'Écran principal',
             'left': 0,
