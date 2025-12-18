@@ -106,3 +106,4 @@ class MainWindow(QMainWindow):
         self.client.disconnect()
         self.logged_out.emit()
         event.accept()
+# end
