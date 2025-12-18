@@ -180,7 +180,7 @@ class LoginWindow(QWidget):
         try:
             if self.pw_toggle.isChecked():
                 self.password_input.setEchoMode(QLineEdit.Normal)
-                self.pw_toggle.setText("🙈")
+                self.pw_toggle.setText("⌣")
             else:
                 self.password_input.setEchoMode(QLineEdit.Password)
                 self.pw_toggle.setText("👁")
