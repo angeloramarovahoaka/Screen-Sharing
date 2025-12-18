@@ -17,8 +17,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
-from app.ui_login import LoginWindow
-from app.ui_main import MainWindow
+from app.ui import LoginWindow, MainWindow
 from app.config import app_state
 
 

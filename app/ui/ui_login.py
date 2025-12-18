@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QFont, QPixmap, QPalette, QColor
 
-from .config import USERS, app_state
+from ..config import USERS, app_state
 from .ui_style import THEME, button_solid
 
 

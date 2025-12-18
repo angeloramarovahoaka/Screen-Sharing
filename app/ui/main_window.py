@@ -11,10 +11,10 @@ from PySide6.QtCore import Qt, Signal, QTimer
 
 from ..config import app_state
 from ..client_module import ScreenClient, MultiScreenClient
-from ..server_module import ScreenServer
-from ..ui_login import UserInfoWidget
-from ..ui_screens import ScreenListWidget, ScreenViewer
-from ..ui_style import THEME, ToastOverlay, button_solid, button_outline, status_badge
+from ..server import ScreenServer
+from .ui_login import UserInfoWidget
+from .ui_screens import ScreenListWidget, ScreenViewer
+from .ui_style import THEME, ToastOverlay, button_solid, button_outline, status_badge
 from .dialogs import AddScreenDialog, LogoutConfirmDialog, MonitorSelectDialog
 
 
