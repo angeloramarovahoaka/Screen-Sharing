@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 from ..config import COMMAND_PORT, VIDEO_PORT
-from ..client_module import DiscoveryScanner
+from app.client.discovery import DiscoveryScanner
 
 
 class AddScreenDialog(QDialog):

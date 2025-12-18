@@ -12,7 +12,7 @@ from PySide6.QtGui import (
     QKeyEvent, QWheelEvent, QCursor, QColor, QLinearGradient
 )
 from PySide6.QtCore import QEvent
-from ..client_module import ScreenClient
+from app.client.screen_client import ScreenClient
 
 
 def _ui_debug(msg: str):

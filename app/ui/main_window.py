@@ -10,7 +10,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QTimer
 
 from ..config import app_state
-from ..client_module import ScreenClient, MultiScreenClient
+from app.client.screen_client import ScreenClient
+from app.client.multi_screen_client import MultiScreenClient
 from ..server import ScreenServer
 from .ui_login import UserInfoWidget
 from .ui_screens import ScreenListWidget, ScreenViewer
