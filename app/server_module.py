@@ -29,6 +29,13 @@ try:
 except ImportError:
     from PIL import ImageGrab
 
+# Import mss pour le support multi-moniteur
+try:
+    import mss
+    HAS_MSS = True
+except ImportError:
+    HAS_MSS = False
+
 from .config import VIDEO_PORT, COMMAND_PORT, BUFFER_SIZE, JPEG_QUALITY, DEFAULT_WIDTH, DISCOVERY_PORT
 # Safe maximum UDP payload size (bytes). Keep comfortably under 65507 and typical MTU.
 MAX_UDP_PAYLOAD = 60000
@@ -92,6 +99,10 @@ class ScreenServer(QObject):
         # Résolution d'écran (à ajuster selon votre écran)
         self.screen_width = 1920
         self.screen_height = 1080
+        
+        # Multi-monitor support
+        self.selected_monitor = 1  # 0 = tous les écrans, 1+ = moniteur spécifique
+        self.monitor_info = None   # Info du moniteur sélectionné (left, top, width, height)
         
         # État
         self.is_running = False
@@ -271,6 +282,84 @@ class ScreenServer(QObject):
         except Exception:
             return "127.0.0.1"
         
+    def get_monitors(self):
+        """Retourne la liste des moniteurs disponibles
+        
+        Returns:
+            list: Liste de dictionnaires {id, name, left, top, width, height, is_primary}
+        """
+        monitors = []
+        
+        if HAS_MSS:
+            try:
+                with mss.mss() as sct:
+                    # sct.monitors[0] = tous les écrans combinés
+                    # sct.monitors[1+] = moniteurs individuels
+                    for i, mon in enumerate(sct.monitors):
+                        if i == 0:
+                            # Écran virtuel (tous combinés) - seulement si plusieurs moniteurs
+                            if len(sct.monitors) > 2:
+                                monitors.append({
+                                    'id': 0,
+                                    'name': 'Tous les écrans',
+                                    'left': mon['left'],
+                                    'top': mon['top'],
+                                    'width': mon['width'],
+                                    'height': mon['height'],
+                                    'is_primary': False
+                                })
+                        else:
+                            monitors.append({
+                                'id': i,
+                                'name': f'Écran {i}' + (' (Principal)' if i == 1 else ''),
+                                'left': mon['left'],
+                                'top': mon['top'],
+                                'width': mon['width'],
+                                'height': mon['height'],
+                                'is_primary': (i == 1)
+                            })
+                return monitors
+            except Exception as e:
+                logger.warning(f"Error getting monitors with mss: {e}")
+        
+        # Fallback final: un seul écran par défaut
+        return [{
+            'id': 1,
+            'name': 'Écran principal',
+            'left': 0,
+            'top': 0,
+            'width': self.screen_width,
+            'height': self.screen_height,
+            'is_primary': True
+        }]
+    
+    def set_monitor(self, monitor_id: int):
+        """Définit le moniteur à capturer
+        
+        Args:
+            monitor_id: 0 = tous les écrans, 1+ = moniteur spécifique
+        """
+        self.selected_monitor = monitor_id
+        monitors = self.get_monitors()
+        
+        # Trouver le moniteur sélectionné
+        for mon in monitors:
+            if mon['id'] == monitor_id:
+                self.monitor_info = mon
+                self.screen_width = mon['width']
+                self.screen_height = mon['height']
+                logger.info(f"Selected monitor {monitor_id}: {mon['name']} ({mon['width']}x{mon['height']} at {mon['left']},{mon['top']})")
+                return True
+        
+        # Si non trouvé, utiliser le premier
+        if monitors:
+            self.monitor_info = monitors[0]
+            self.screen_width = monitors[0]['width']
+            self.screen_height = monitors[0]['height']
+            logger.warning(f"Monitor {monitor_id} not found, using {monitors[0]['name']}")
+        
+        return False
+
     def start_streaming(self):
         """Démarre le streaming vidéo (sur demande)"""
         if self.is_streaming:
@@ -498,15 +587,64 @@ class ScreenServer(QObject):
             vid = None
             logger.info("Using screen capture for video streaming")
             
+            # Déterminer la zone de capture selon le moniteur sélectionné
+            capture_bbox = None
+            use_mss = HAS_MSS and self.selected_monitor > 0
+            
+            if self.monitor_info and self.selected_monitor > 0:
+                # Capturer un moniteur spécifique
+                capture_bbox = (
+                    self.monitor_info['left'],
+                    self.monitor_info['top'],
+                    self.monitor_info['left'] + self.monitor_info['width'],
+                    self.monitor_info['top'] + self.monitor_info['height']
+                )
+                logger.info(f"Capturing monitor {self.selected_monitor}: bbox={capture_bbox}")
+            else:
+                logger.info("Capturing all screens (no specific monitor selected)")
+            
+            # Créer le contexte mss une seule fois si on l'utilise
+            mss_context = None
+            if use_mss:
+                try:
+                    mss_context = mss.mss()
+                    logger.info("Using mss for screen capture")
+                except Exception as e:
+                    logger.warning(f"Failed to create mss context: {e}, falling back to PIL")
+                    use_mss = False
+            
             frame_count = 0
             last_log_time = time.time()
 
             while self.is_running and self.is_streaming:
                 try:
                     # Capture screen frame
-                    img_pil = ImageGrab.grab()
-                    frame = np.array(img_pil, dtype=np.uint8)
-                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    if use_mss and mss_context and self.selected_monitor > 0:
+                        # Utiliser mss pour capturer le moniteur spécifique
+                        try:
+                            monitor = mss_context.monitors[self.selected_monitor]
+                            sct_img = mss_context.grab(monitor)
+                            # Convertir en numpy array
+                            frame = np.array(sct_img, dtype=np.uint8)
+                            # mss retourne BGRA, convertir en BGR
+                            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+                        except Exception as e:
+                            logger.debug(f"mss capture failed: {e}, using PIL fallback")
+                            if capture_bbox:
+                                img_pil = ImageGrab.grab(bbox=capture_bbox)
+                            else:
+                                img_pil = ImageGrab.grab()
+                            frame = np.array(img_pil, dtype=np.uint8)
+                            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    else:
+                        # Utiliser PIL/pyscreenshot
+                        if capture_bbox:
+                            img_pil = ImageGrab.grab(bbox=capture_bbox)
+                        else:
+                            img_pil = ImageGrab.grab()
+                        frame = np.array(img_pil, dtype=np.uint8)
+                        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    
                     frame = imutils.resize(frame, width=DEFAULT_WIDTH)
 
                     # Encode JPEG (simple comme server-with-cam.py)
