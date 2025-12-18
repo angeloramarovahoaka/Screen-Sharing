@@ -416,49 +416,6 @@ class ScreenServer(QObject):
                 pass
             self._discovery_socket = None
         logger.info("Discovery broadcast stopped")
-    
-    # def _discovery_broadcaster(self):
-    #     """Thread qui envoie périodiquement un message d'annonce sur le réseau"""
-    #     try:
-    #         self._discovery_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    #         self._discovery_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    #         self._discovery_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            
-    #         local_ip = self._get_local_ip()
-            
-    #         while self.is_streaming and self.is_running:
-    #             try:
-    #                 # Message d'annonce JSON
-    #                 announcement = json.dumps({
-    #                     "type": "screen_share_announcement",
-    #                     "name": self._sharer_name,
-    #                     "ip": local_ip,
-    #                     "port": COMMAND_PORT,
-    #                     "video_port": VIDEO_PORT
-    #                 })
-                    
-    #                 # Envoyer en broadcast
-    #                 self._discovery_socket.sendto(
-    #                     announcement.encode('utf-8'),
-    #                     ('<broadcast>', DISCOVERY_PORT)
-    #                 )
-    #                 logger.debug(f"Sent discovery broadcast: {announcement}")
-                    
-    #             except Exception as e:
-    #                 logger.debug(f"Discovery broadcast error: {e}")
-                
-    #             # Attendre 2 secondes avant le prochain broadcast
-    #             time.sleep(2)
-                
-    #     except Exception as e:
-    #         logger.exception(f"Discovery broadcaster error: {e}")
-    #     finally:
-    #         if self._discovery_socket:
-    #             try:
-    #                 self._discovery_socket.close()
-    #             except Exception:
-    #                 pass
-    #             self._discovery_socket = None
 
     def _discovery_broadcaster(self):
         """Thread qui envoie périodiquement un message d'annonce sur le réseau"""
