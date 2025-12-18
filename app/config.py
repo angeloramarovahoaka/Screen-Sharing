@@ -7,21 +7,11 @@ import os
 VIDEO_PORT = 9999
 COMMAND_PORT = 9998
 DISCOVERY_PORT = 9997  # Port UDP pour la découverte des serveurs actifs
-# Buffer UDP assez grand pour recevoir les frames (max ~65KB pour UDP)
 BUFFER_SIZE = 131072  # 128KB buffer for socket recv
-
-# --- CONFIGURATION VIDÉO ---
-# Résolution réduite pour garder les paquets UDP sous ~60KB
-# Increase default capture width for better image quality (can be overridden with SS_WIDTH)
 DEFAULT_WIDTH = int(os.getenv("SS_WIDTH", "1280"))
-# DEFAULT_HEIGHT is kept for backward compatibility, but we'll compute height dynamically when needed
 DEFAULT_HEIGHT = int(os.getenv("SS_HEIGHT", "720"))
-# Qualité JPEG (plus haut = meilleure image, plus de bande passante)
 JPEG_QUALITY = int(os.getenv("SS_JPEG_QUALITY", "90"))
 
-# (Camera & audio features removed — application streams screen only)
-
-# --- CONFIGURATION UTILISATEUR ---
 # Simulation simple d'utilisateurs (dans une vraie app, utiliser une BDD)
 USERS = {
     "admin": "admin123",
