@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QListWidget, QListWidgetItem, QLabel, QPushButton, QHBoxLayout
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QListWidget, QListWidgetItem, QLabel, QPushButton, QHBoxLayout, QCheckBox
 from PySide6.QtCore import Qt
 
 
@@ -72,6 +72,13 @@ class MonitorSelectDialog(QDialog):
         subtitle_label.setObjectName("subtitleLabel")
         subtitle_label.setWordWrap(True)
         layout.addWidget(subtitle_label)
+
+        # Option: partager tout le bureau
+        self.share_all_checkbox = QCheckBox("Partager tout le bureau (tous les écrans)")
+        self.share_all_checkbox.setCursor(Qt.PointingHandCursor)
+        self.share_all_checkbox.setChecked(False)
+        self.share_all_checkbox.toggled.connect(self._on_share_all_toggled)
+        layout.addWidget(self.share_all_checkbox)
 
         # Liste des moniteurs
         self.monitor_list = QListWidget()
@@ -155,6 +162,35 @@ class MonitorSelectDialog(QDialog):
     def _on_monitor_double_clicked(self, item):
         self.selected_monitor_id = item.data(Qt.UserRole)
         self.accept()
+
+    def _on_share_all_toggled(self, checked: bool):
+        """Handler when the "share all" checkbox is toggled.
+
+        When checked we disable the list and set the selected monitor to 0
+        (meaning: share the whole desktop). When unchecked we re-enable
+        the list and keep/restore selection.
+        """
+        if checked:
+            # Prefer id 0 (all screens) when available; otherwise 0 still
+            # signals the server to attempt capturing the whole desktop.
+            self.selected_monitor_id = 0
+            self.monitor_list.setDisabled(True)
+            # If the list contains an item with data==0, select it for clarity
+            for i in range(self.monitor_list.count()):
+                itm = self.monitor_list.item(i)
+                if itm.data(Qt.UserRole) == 0:
+                    self.monitor_list.setCurrentItem(itm)
+                    break
+        else:
+            # Re-enable list and pick selected item (or first) as default
+            self.monitor_list.setDisabled(False)
+            cur = self.monitor_list.currentItem()
+            if cur:
+                self.selected_monitor_id = cur.data(Qt.UserRole)
+            elif self.monitor_list.count() > 0:
+                itm = self.monitor_list.item(0)
+                self.monitor_list.setCurrentItem(itm)
+                self.selected_monitor_id = itm.data(Qt.UserRole)
 
     def get_selected_monitor(self):
         return self.selected_monitor_id
