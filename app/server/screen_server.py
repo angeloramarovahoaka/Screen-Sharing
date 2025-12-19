@@ -92,8 +92,11 @@ class ScreenServer(QObject):
     def set_monitor(self, monitor_id: int) -> bool:
         """Définit le moniteur à capturer."""
         result = self.monitor_manager.set_monitor(monitor_id)
-        # Mettre à jour le command handler avec les nouvelles dimensions
-        self.command_handler.update_screen_size(
+        # Mettre à jour le command handler avec la géométrie (offset + taille)
+        mi = self.monitor_manager.monitor_info or {}
+        self.command_handler.update_screen_geometry(
+            mi.get('left', 0),
+            mi.get('top', 0),
             self.monitor_manager.screen_width,
             self.monitor_manager.screen_height
         )

@@ -49,6 +49,9 @@ class CommandHandler:
         self.keyboard = KeyboardController()
         self.screen_width = screen_width
         self.screen_height = screen_height
+        # Offset of the current capture region (left, top) in global coordinates
+        self.screen_left = 0
+        self.screen_top = 0
         self._pressed_modifiers = set()
     
     def update_screen_size(self, width: int, height: int):
@@ -60,6 +63,23 @@ class CommandHandler:
         """
         self.screen_width = width
         self.screen_height = height
+
+    def update_screen_geometry(self, left: int, top: int, width: int, height: int):
+        """Update both offset and size for the active capture region.
+
+        Args:
+            left: x origin of the capture area in global coordinates
+            top: y origin of the capture area in global coordinates
+            width: width of the capture area
+            height: height of the capture area
+        """
+        try:
+            self.screen_left = int(left or 0)
+            self.screen_top = int(top or 0)
+        except Exception:
+            self.screen_left = 0
+            self.screen_top = 0
+        self.update_screen_size(width, height)
     
     def execute(self, command: dict):
         """Exécute une commande reçue.
@@ -83,8 +103,11 @@ class CommandHandler:
         action = command['action']
         
         if action != 'scroll':
-            x = int(command['x'] * self.screen_width)
-            y = int(command['y'] * self.screen_height)
+            # command['x'], command['y'] are normalized [0..1] relative to the
+            # selected monitor. Convert to absolute global coordinates by
+            # scaling by monitor size and adding the monitor offset (left/top).
+            x = int(command['x'] * self.screen_width) + getattr(self, 'screen_left', 0)
+            y = int(command['y'] * self.screen_height) + getattr(self, 'screen_top', 0)
             self.mouse.position = (x, y)
         
         if action == 'move':
