@@ -106,6 +106,12 @@ class MonitorSelectDialog(QDialog):
         self.monitor_list.itemDoubleClicked.connect(self._on_monitor_double_clicked)
         layout.addWidget(self.monitor_list)
 
+        # Initialiser la checkbox si la liste contient explicitement l'entrée "Tous les écrans" (id == 0)
+        has_all = any(mon.get('id') == 0 for mon in self.monitors)
+        if has_all:
+            # This will trigger the toggled handler which will disable the list
+            self.share_all_checkbox.setChecked(True)
+
         # Boutons
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(12)

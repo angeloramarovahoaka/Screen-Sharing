@@ -112,6 +112,13 @@ class VideoStreamer:
             return False
         
         try:
+            # Log current monitor selection and capture bbox for debugging
+            try:
+                bbox = self.monitor_manager.get_capture_bbox()
+            except Exception:
+                bbox = None
+            logger.debug(f"Capture request: selected={self.monitor_manager.selected_monitor} monitor_info={self.monitor_manager.monitor_info} bbox={bbox}")
+
             # Capturer la frame
             frame = self._capture_frame()
             if frame is None:

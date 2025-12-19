@@ -38,43 +38,86 @@ class MonitorManager:
             {id, name, left, top, width, height, is_primary}
         """
         monitors = []
-        
+
+        # 1) Essayer mss si disponible
         if HAS_MSS:
             try:
                 with mss.mss() as sct:
                     # sct.monitors[0] = tous les écrans combinés
-                    # sct.monitors[1+] = moniteurs individuels
-                    for i, mon in enumerate(sct.monitors):
-                        if i == 0:
-                            # Écran virtuel (tous combinés) - seulement si plusieurs moniteurs
-                            if len(sct.monitors) > 2:
-                                monitors.append({
-                                    'id': 0,
-                                    'name': 'Tous les écrans',
-                                    'left': mon['left'],
-                                    'top': mon['top'],
-                                    'width': mon['width'],
-                                    'height': mon['height'],
-                                    'is_primary': False
-                                })
-                        else:
+                    # sct.monitors[1:] = moniteurs individuels
+                    if len(sct.monitors) > 1:
+                        # Ajouter l'option "Tous les écrans" si plus d'un moniteur
+                        if len(sct.monitors) > 2:
+                            mon = sct.monitors[0]
+                            monitors.append({
+                                'id': 0,
+                                'name': 'Tous les écrans',
+                                'left': mon.get('left', 0),
+                                'top': mon.get('top', 0),
+                                'width': mon.get('width', self.default_width),
+                                'height': mon.get('height', self.default_height),
+                                'is_primary': False
+                            })
+
+                        for i, mon in enumerate(sct.monitors[1:], start=1):
                             monitors.append({
                                 'id': i,
                                 'name': f'Écran {i}' + (' (Principal)' if i == 1 else ''),
-                                'left': mon['left'],
-                                'top': mon['top'],
-                                'width': mon['width'],
-                                'height': mon['height'],
+                                'left': mon.get('left', 0),
+                                'top': mon.get('top', 0),
+                                'width': mon.get('width', self.default_width),
+                                'height': mon.get('height', self.default_height),
                                 'is_primary': (i == 1)
                             })
+
                         logger.info(f"Detected {len(monitors)} monitors via mss")
                         return monitors
             except Exception as e:
                 logger.warning(f"Error getting monitors with mss: {e}")
-        
-        # Fallback: un seul écran par défaut
-            logger.info("No multi-monitor detection available, using default 1 monitor fallback")
-            return [{
+
+        # 2) Fallback via Qt (si l'application Qt est initialisée)
+        try:
+            from PySide6.QtGui import QGuiApplication
+            app = QGuiApplication.instance()
+            if app is not None:
+                screens = app.screens()
+                if screens:
+                    if len(screens) > 1:
+                        # construire la bbox totale
+                        lefts = [s.geometry().x() for s in screens]
+                        tops = [s.geometry().y() for s in screens]
+                        rights = [s.geometry().x() + s.geometry().width() for s in screens]
+                        bottoms = [s.geometry().y() + s.geometry().height() for s in screens]
+                        monitors.append({
+                            'id': 0,
+                            'name': 'Tous les écrans',
+                            'left': min(lefts),
+                            'top': min(tops),
+                            'width': max(rights) - min(lefts),
+                            'height': max(bottoms) - min(tops),
+                            'is_primary': False
+                        })
+
+                    for i, s in enumerate(screens, start=1):
+                        g = s.geometry()
+                        monitors.append({
+                            'id': i,
+                            'name': s.name() or f'Écran {i}',
+                            'left': g.x(),
+                            'top': g.y(),
+                            'width': g.width(),
+                            'height': g.height(),
+                            'is_primary': (i == 1)
+                        })
+
+                    logger.info(f"Detected {len(monitors)} monitors via Qt")
+                    return monitors
+        except Exception as e:
+            logger.debug(f"Qt screens fallback failed: {e}")
+
+        # 3) Fallback final: un seul écran par défaut
+        logger.info("No multi-monitor detection available, using default 1 monitor fallback")
+        return [{
             'id': 1,
             'name': 'Écran principal',
             'left': 0,
