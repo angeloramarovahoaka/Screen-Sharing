@@ -451,18 +451,23 @@ class MainWindow(QMainWindow):
         else:
             # Obtenir la liste des moniteurs
             monitors = self.server.get_monitors()
-            
-            # Si plusieurs moniteurs, afficher le dialogue de sélection
-            if len(monitors) > 1:
+            _ui_debug(f"toggle_screen_sharing detected monitors: {monitors}")
+
+            # Afficher le dialogue de sélection même si un seul moniteur.
+            # Rationale: sur certaines machines la détection peut retourner
+            # un fallback d'un seul écran après suppression des caches
+            # ou pour d'autres raisons; permettre à l'utilisateur de
+            # confirmer ou changer le choix améliore la robustesse.
+            if len(monitors) >= 1:
                 dialog = MonitorSelectDialog(monitors, self)
                 if dialog.exec() != QDialog.Accepted:
                     return  # L'utilisateur a annulé
-                
+
                 selected_id = dialog.get_selected_monitor()
                 self.server.set_monitor(selected_id)
-            elif len(monitors) == 1:
-                # Un seul moniteur, le sélectionner automatiquement
-                self.server.set_monitor(monitors[0]['id'])
+            else:
+                # Aucun moniteur détecté (très improbable) -> utiliser fallback
+                self.server.set_monitor(1)
             
             # Démarrer le serveur si pas encore lancé
             if not self.server.is_running:
