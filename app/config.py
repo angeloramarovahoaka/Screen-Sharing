@@ -19,10 +19,7 @@ DEFAULT_HEIGHT = int(os.getenv("SS_HEIGHT", "720"))
 # Qualité JPEG (plus haut = meilleure image, plus de bande passante)
 JPEG_QUALITY = int(os.getenv("SS_JPEG_QUALITY", "90"))
 
-# (Camera & audio features removed — application streams screen only)
-
 # --- CONFIGURATION UTILISATEUR ---
-# Simulation simple d'utilisateurs (dans une vraie app, utiliser une BDD)
 USERS = {
     "admin": "admin123",
     "user1": "password1",
