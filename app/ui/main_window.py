@@ -298,6 +298,13 @@ class MainWindow(QMainWindow):
                     self.close_zoom()
                 except Exception:
                     pass
+
+            # Retirer l'écran de la liste et déconnecter le client
+            try:
+                # remove_screen gère la déconnexion du client et la suppression de la miniature
+                self.remove_screen(screen_id)
+            except Exception:
+                pass
             
     def zoom_screen(self, screen_id):
         """Ouvre la vue zoom pour un écran"""
