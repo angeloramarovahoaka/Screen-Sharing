@@ -16,6 +16,9 @@ import sys
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
+import argparse
+
+from tools.clean_pycaches import clean_pycaches
 
 from app.ui_login import LoginWindow
 from app.ui_main import MainWindow
@@ -145,4 +148,24 @@ def main():
 
 
 if __name__ == "__main__":
+    # Parse only our custom flag and leave the rest for QApplication
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument(
+        "--clean-pycaches",
+        action="store_true",
+        help="Remove all __pycache__ directories under the current project before starting",
+    )
+    args, remaining = parser.parse_known_args()
+    if args.clean_pycaches:
+        print("🧹 Nettoyage des __pycache__...")
+        removed = clean_pycaches(root=".")
+        if removed:
+            for p in removed:
+                print(f"- Supprimé: {p}")
+        else:
+            print("Aucun __pycache__ trouvé.")
+        print()
+
+    # Replace sys.argv so Qt doesn't see our custom flag
+    sys.argv = [sys.argv[0]] + remaining
     main()

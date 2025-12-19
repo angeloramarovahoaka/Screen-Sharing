@@ -12,6 +12,7 @@ import sys
 import argparse
 from app.server_module import ScreenServer
 from app.config import VIDEO_PORT, COMMAND_PORT
+from tools.clean_pycaches import clean_pycaches
 
 
 def main():
@@ -40,8 +41,23 @@ def main():
         default=None,
         help="Optional log collector in format host:port to forward logs"
     )
+    parser.add_argument(
+        "--clean-pycaches",
+        action="store_true",
+        help="Remove all __pycache__ directories under the current project before starting"
+    )
     
     args = parser.parse_args()
+    # If requested, clean __pycache__ directories before startup
+    if args.clean_pycaches:
+        print("🧹 Nettoyage des __pycache__...")
+        removed = clean_pycaches(root=".")
+        if removed:
+            for p in removed:
+                print(f"- Supprimé: {p}")
+        else:
+            print("Aucun __pycache__ trouvé.")
+        print()
     
     print("=" * 50)
     print("🖥️  SERVEUR DE PARTAGE D'ÉCRAN")
